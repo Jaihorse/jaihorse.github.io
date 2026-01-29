@@ -67,7 +67,8 @@ let targetDepth = BASE_DEPTH;   // actual search depth
 
 /* ===== GAME / PIECE CONSTANTS ===== */
 const GS_LGHT=0, GS_LMOV=1, GS_DARK=2, GS_NONE=3;
-let gameState = GS_LGHT, gameCount = 0;
+let gameState = GS_LGHT, gameCount = 0, gameStartTime = 0;
+let moveHistoryStr = "", gameResultStr = "";
 
 const LGHT =0, DARK =1;
 const L_PWN=0, D_PWN=1, L_HRS=2, D_HRS=3, EMPTY=4, NOUSE=5;
@@ -250,17 +251,18 @@ function waitForAssets() { // wait for images, egdb, and bkdb loading complete
   if (!imagesLoaded || egdbLoaded===0 || bkdbLoaded===0) { 
     setTimeout(waitForAssets, 200); return; 
   }
-  fetch("visit.php?level=1&result="+egdbLoaded+"-"+bkdbLoaded);
+  fetch(VISIT_LOG_URL + "level=1&result="+egdbLoaded+"-"+bkdbLoaded);
   startGame();
 }
 
 async function startGame() {
   bCompBusy = true;
-  gameCount++; compFirst = !(gameCount & 1);
+  gameStartTime = performance.now(); 
+  gameCount++; compFirst = !(gameCount & 1); moveHistoryStr = "";
   initEngineState(); await warmUp(500);
   pieceSelected = false; selectedCell = -1; selectedTo = -1;
   dragX = dragY = 0; wasDragging = false;
-  initCellOffsets(); drawPieces(); 
+  initCellOffsets(); drawBoard(); drawPieces(); 
 
   message("Jaihorse makhos.com"); version(CODE_VERSION+" level "+level); 
   showNewGame(false); showStyleIcon(); await warmUp(500); 
@@ -1326,6 +1328,7 @@ async function executePlayerMove(selIndex) {
   //if(boardStyle !== STYLE_MODERN) 
   playSound(bits === MMOVE ? SOUND_HIT : SOUND_CAP);
   makemove(mv); lastmove = mv; lastmoveCap = to;
+  addMoveToHistory(mv);
   if (BITS(lastmove) === MMOVE && pc[to] === L_HRS) drawCount++;
   else drawCount = 0;
   pieceSelected = false; gameState = GS_DARK; // bCompBusy=true; 
@@ -1367,6 +1370,22 @@ function cacheForceMove(){
   forceMove=-1;
   if(gen_end[0]===1) forceMove=TO(gen_dat[0]);
 }
+
+function addMoveToHistory(mv) {
+  moveHistoryStr += moveToStr(mv);
+}
+
+function moveToStr(mv) {
+  const fm = cellToNum[FM(mv)];
+  const to = cellToNum[TO(mv)];
+  const bits = BITS(mv);
+  let sym = "-";
+  if (bits & MSKIP) return ".";
+  if (bits & MCAPTURE) sym = "x";
+  if (bits & MPROMOTE) sym = "+";
+  return fm + sym + to + " ";  // e.g. "25-24 24x18 . 18x14 "
+}
+
 
 
 function getCellFromClientPos(canvas, clientX, clientY) {
@@ -1964,6 +1983,7 @@ async function aiMainLoop(){
       bCompBusy = false;
     }
     makemove(bestmv); lastmove=bestmv; 
+    addMoveToHistory(bestmv);
     if(!(lastmove & MSKIP)) lastmoveCap = TO(bestmv);
     if(BITS(lastmove)===MMOVE && pc[TO(lastmove)]===D_HRS){ 
       drawCount++; 
@@ -2016,10 +2036,17 @@ function forceOpeningMove() {
   return mv;
 }
 
+const VISIT_LOG_URL = "https://chnp.co.th/makhos/visit.php?";
 
 function gameOver(r) { // +1 player won, 0 draw, -1 player lost
-  const result = r>0 ? "win" : (r<0 ? "loose" : "draw");
-  fetch("visit.php?level=" + level + "&result=" + result); // log
+  const result = r>0 ? "W" : (r<0 ? "L" : "D");
+  const elapsed = Math.round((performance.now() - gameStartTime) / 1000);
+  gameResultStr += level + result + " ";
+  //console.log(gameCount,level,result,elapsed,gameResultStr,moveHistoryStr);
+  //fetch(VISIT_LOG_URL + "level=" + level + "&result=" + result); // log
+  fetch(VISIT_LOG_URL + "level=" + level + 
+      "&result=" + encodeURIComponent(gameResultStr) + 
+      "&moves="  + encodeURIComponent(moveHistoryStr)); // log
   const msg = r>0 ? "คุณชนะ" : (r<0 ? "คุณแพ้" : "เสมอกัน");
   message(msg + "!, เริ่มเกมใหม่");
   showOverlay(msg);
