@@ -251,7 +251,7 @@ function waitForAssets() { // wait for images, egdb, and bkdb loading complete
   if (!imagesLoaded || egdbLoaded===0 || bkdbLoaded===0) { 
     setTimeout(waitForAssets, 200); return; 
   }
-  fetch(VISIT_LOG_URL + "level=1&result="+egdbLoaded+"-"+bkdbLoaded);
+  fetch(VISIT_LOG_URL + "level=1&result="+egdbLoaded+"&moves="+bkdbLoaded);
   startGame();
 }
 
