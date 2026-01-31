@@ -8,6 +8,7 @@
 body{background:#111;color:#eee;font-family:sans-serif;font-size:0.8rem;}
 canvas{border:1px solid #666;background:#222;}
 h3{margin:0;padding:0;}
+code{font-family: monospace;color:#abc;}
 
 button{
   background:#333;color:#ddd;border:1px solid #555;
@@ -55,14 +56,14 @@ input[readonly], textarea[readonly]{
     <div id="replayBox">
       นำเลขการเดินมาใส่, กด load เพื่อแสดงการเดิน<br>
       <textarea id="moveInput" class="codeBox codeArea" rows="3"
-          placeholder="25-22 8-11 22-18 11-15 18x11 7-x16"></textarea><br>
+          placeholder="25-22 8-11 22-18 11-15 18x11 7x16"></textarea><br>
       <button onclick="loadMoves()">Load</button>
       <button onclick="stepFirst()">⏮</button>
       <button onclick="stepBack()">◀</button>
       <button onclick="stepNext()">▶</button>
       <button onclick="stepLast()">⏭</button>
       <span id="stepInfo"></span><br>
-      ตัวอย่าง 25-22 8-11 22-18 11-15 18x11 7-x16<br>
+      ตัวอย่าง 25-22 8-11 22-18 11-15 18x11 7x16<br>
     </div>
     <br>
     <div id="remark">
@@ -135,14 +136,14 @@ input[readonly], textarea[readonly]{
       <button onclick="loadFromCode()">show</button>
       <br>
       ตัวอย่าง มาตรฐาน-สามเรียง<br>
-      xxx...xxx.x...x..o...oo...oo.ooo<br>
+      <code>xxx...xxx.x...x..o...oo...oo.ooo</code><br>
     </div>
 
 
   </div>
 </div>
 
-<script src="int32Array.js?v=20260128"></script>
+<script src="int32Array.js?v=20260131_1829"></script>
 
 </body>
 </html>
