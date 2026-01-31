@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Makhos Book Probe</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+body{background:#121212;color:#e0e0e0;font-family:monospace;}
+canvas{border:1px solid #666;background:#1a1a1a;}
+
+button{
+  background:#2a2a2a;color:#ddd;border:1px solid #555;
+  padding:4px 10px;margin:2px;min-width:36px;
+  border-radius:6px;cursor:pointer;
+}
+button:hover{background:#3a3a3a;border-color:#777;color:#fff;}
+button:active{background:#1f1f1f;border-color:#999;}
+
+#bkinfo{
+  width:220px;height:10em;overflow-y:auto;white-space:pre;
+  border:1px solid #555;padding:4px;background:#1a1a1a;
+}
+#remark{width:420px;}
+
+.left-col{display:flex;flex-direction:column;align-items:flex-start;}
+
+.codeBox{
+  width:260px;background:#1e2a33;color:#9fb6c6;
+  border:1px solid #5c7a8f;
+}
+
+
+</style>
+
+</head>
+<body>
+
+<div style="display:flex;">
+
+  <!-- left column -->
+  <div class="left-col">
+    <canvas id="board" width="480" height="480"></canvas>
+    <br>
+    <b>ข้อมูลรายละเอียดด้านเทคนิค</b><br>
+    <div>
+      code ของรูปนี้, สามารถ copy นำไปใช้ได้<br>
+      <input id="boardCode" class="codeBox" readonly>
+      <button onclick="copyBoardCode()">copy</button>
+      <br>
+      <input id="boardKey" class="codeBox" readonly>
+    </div>
+    <br>
+    <div>
+      นำ code ที่รู้มาใส่, กด show เพื่อแสดงรูป<br>
+      <input id="codeInput" class="codeBox">
+      <button onclick="loadFromCode()">show</button>
+    </div>
+    <br>
+    <div>
+    ตัวอย่าง มาตรฐาน-สามเรียง และ อีปุ้ม-กองโจร<br>
+    xxx...xxx.x...x..o...oo...oo.ooo<br>
+    xxx.x.x..xx......o.x.oo..o.o.ooo<br>
+    </div>
+    <br>
+    <div id="remark">
+    <b>หมายเหตุ</b><br>
+    ข้อมูลรูปแบบการเดินหมากที่ใช้ในการคำนวณนี้ ได้มาจากการรวบรวมและป้อนข้อมูลโดยสมาชิกชมรม makhos.com และอาจารย์หลายท่าน ซึ่งได้ร่วมกันบันทึกรูปหมากต่างๆ ระหว่างปี พ.ศ. 2545–2549 เนื่องจากเป็นการรวบรวมมาจากหลายแหล่ง อาจมีทางเดินบางส่วนที่ไม่ถูกต้อง หรือข้อมูลล้าสมัยซึ่งต่อมาได้มีการพิสูจน์ภายหลังแล้วว่าไม่ถูกต้อง
+    </div>
+  </div>
+
+  <!-- right panel -->
+  <div style="margin-left:10px; color:#ddd;">
+
+    <h3>วิเคราะห์ทางเลือกของโปรแกรม</h3>
+
+    <hr>
+
+    <label>แก้ไขกระดาน เลือกตัวเดิน..</label><br>
+    <label><input type="radio" name="piece" value="0" checked>เบี้ยขาว</label><br>
+    <label><input type="radio" name="piece" value="1">เบี้ยดำ</label><br>
+    <label><input type="radio" name="piece" value="2">ฮอสขาว</label><br>
+    <label><input type="radio" name="piece" value="3">ฮอสดำ</label>
+
+    <hr>
+
+    <label>ฝ่ายเดิน</label>
+    <label>
+      <input type="radio" name="side" id="sideLight" checked onclick="setSide(LGHT)">ขาว
+    </label>
+    <label>
+      <input type="radio" name="side" id="sideDark" onclick="setSide(DARK)">ดำ
+    </label>
+    <br>
+    <button onclick="initPieces()">เริ่ม</button>
+    <button onclick="clearBoard()">ล้าง</button>
+    <button onclick="reverseBoard()">สลับ</button>
+    <!--button onclick="reverseColor()">สลับสี</button-->
+
+    <hr>
+
+    <label>ทางเลือกที่เคยมีคนเคยสอน..</label>
+    <!--button onclick="checkBook()">ตรวจความคิด..</button-->
+
+    <!--div id="sideInfo"></div-->
+    <div id="bkinfo"></div>
+    <hr>
+
+    <div id="betterBox">
+      เพิ่มทางเดินใหม่<br>
+      <input id="betterMove" style="width:80px;">
+      <button id="submitBtn" onclick="submitBetterMove()">ส่ง</button>
+      <div id="submitInfo" style="color:#9fb6c6;"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="int32Array.js?v=20260131"></script>
+
+</body>
+</html>
