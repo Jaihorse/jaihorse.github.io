@@ -8,7 +8,7 @@
 body{background:#111;color:#eee;font-family:sans-serif;font-size:0.8rem;}
 canvas{border:1px solid #666;background:#222;}
 h3{margin:0;padding:0;}
-code{font-family: monospace;color:#abc;}
+code{font-family: monospace;}
 
 button{
   background:#333;color:#ddd;border:1px solid #555;
@@ -40,8 +40,6 @@ input[readonly], textarea[readonly]{
 
 .left-col{display:flex;flex-direction:column;align-items:flex-start;}
 
-
-
 </style>
 
 </head>
@@ -52,7 +50,6 @@ input[readonly], textarea[readonly]{
   <!-- left column -->
   <div class="left-col">
     <canvas id="board" width="320" height="320"></canvas>
-    <br>
     <div id="replayBox">
       นำเลขการเดินมาใส่, กด load เพื่อแสดงการเดิน<br>
       <textarea id="moveInput" class="codeBox codeArea" rows="3"
