@@ -20,9 +20,9 @@ let moveList = [], step = 0, curStep = 0, boardHistory = [];   // snapshot à¸‚à¸
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
 
-canvas.style.width  = "480px";
-canvas.style.height = "480px";
-const COLW = 60;
+canvas.style.width  = "320px";
+canvas.style.height = "320px";
+const COLW = 40;
 
 /* ===== COLORS ===== */
 const COL_NOUSE     = "#4f6b7a";
@@ -269,21 +269,21 @@ function draw(){
       const dark=pc[idx]&1;
       ctx.fillStyle=dark?COL_DARK_PAWN:COL_LGHT_PAWN;
       ctx.beginPath();
-      ctx.arc(cx,cy,21,0,Math.PI*2);
+      ctx.arc(cx,cy,COLW/3,0,Math.PI*2);
       ctx.fill();
 
       if(pc[idx]>=2){
         ctx.strokeStyle=dark?COL_DARK_RING:COL_LGHT_RING;
         ctx.lineWidth=2;
         ctx.beginPath();
-        ctx.arc(cx,cy,14,0,Math.PI*2);
+        ctx.arc(cx,cy,COLW/5,0,Math.PI*2);
         ctx.stroke();
       }
     }
 
     if(pc[idx]!==NOUSE){
       ctx.fillStyle="#8fa3b0";
-      ctx.font="10px monospace";
+      ctx.font="9px monospace";
       ctx.textAlign="right";
       ctx.textBaseline="top";
       ctx.fillText(sq32[idx],x*COLW+COLW-3,y*COLW+3);
@@ -349,9 +349,12 @@ document.addEventListener("DOMContentLoaded", ()=>{
 });
 
 function submitBetterMove(showAlert = true){
+  const moveType = document.getElementById("moveType");
+
   fetch("https://chnp.co.th/makhos/bettermove.php" +
         "?code=" + encodeURIComponent(boardCode.value) +
-        "&side=" + side +
+        "&side=" + side  +
+        "&type=" + encodeURIComponent(moveType.value) +
         "&move=" + encodeURIComponent(betterMove.value)
   )
   .then(r => r.text())
