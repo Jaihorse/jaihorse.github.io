@@ -26,9 +26,9 @@ button:active{background:#1f1f1f;border-color:#999;}
 
 .codeBox{
   width:260px;background:#1e2a33;color:#9fb6c6;
-  border:1px solid #5c7a8f;
+  border:1px solid #5c7a8f;font-family: monospace;padding:6px;
 }
-
+.codeArea{width:460px;resize: vertical;line-height:1;}
 
 </style>
 
@@ -54,17 +54,27 @@ button:active{background:#1f1f1f;border-color:#999;}
       นำ code ที่รู้มาใส่, กด show เพื่อแสดงรูป<br>
       <input id="codeInput" class="codeBox">
       <button onclick="loadFromCode()">show</button>
+      <br>
+      ตัวอย่าง มาตรฐาน-สามเรียง<br>
+      xxx...xxx.x...x..o...oo...oo.ooo<br>
     </div>
     <br>
-    <div>
-    ตัวอย่าง มาตรฐาน-สามเรียง และ อีปุ้ม-กองโจร<br>
-    xxx...xxx.x...x..o...oo...oo.ooo<br>
-    xxx.x.x..xx......o.x.oo..o.o.ooo<br>
+    <div id="replayBox">
+      นำเลขการเดินมาใส่, กด load เพื่อแสดงการเดิน<br>
+      <textarea id="moveInput" class="codeBox codeArea" rows="3"
+          placeholder="25-12 8-11 24x15 ..."></textarea><br>
+      <button onclick="loadMoves()">Load</button>
+      <button onclick="stepFirst()">⏮</button>
+      <button onclick="stepBack()">◀</button>
+      <button onclick="stepNext()">▶</button>
+      <button onclick="stepLast()">⏭</button>
+      <span id="stepInfo"></span><br>
+      ตัวอย่าง 25-22 11-15 22-18 15x22 26x17 6-10 17-13 1-6 29-25<br>
     </div>
     <br>
     <div id="remark">
-    <b>หมายเหตุ</b><br>
-    ข้อมูลรูปแบบการเดินหมากที่ใช้ในการคำนวณนี้ ได้มาจากการรวบรวมและป้อนข้อมูลโดยสมาชิกชมรม makhos.com และอาจารย์หลายท่าน ซึ่งได้ร่วมกันบันทึกรูปหมากต่างๆ ระหว่างปี พ.ศ. 2545–2549 เนื่องจากเป็นการรวบรวมมาจากหลายแหล่ง อาจมีทางเดินบางส่วนที่ไม่ถูกต้อง หรือข้อมูลล้าสมัยซึ่งต่อมาได้มีการพิสูจน์ภายหลังแล้วว่าไม่ถูกต้อง
+      <b>หมายเหตุ</b><br>
+      ข้อมูลรูปแบบการเดินหมากที่ใช้ในการคำนวณนี้ ได้มาจากการรวบรวมและป้อนข้อมูลโดยสมาชิกชมรม makhos.com และอาจารย์หลายท่าน ซึ่งได้ร่วมกันบันทึกรูปหมากต่างๆ ระหว่างปี พ.ศ. 2545–2549 เนื่องจากเป็นการรวบรวมมาจากหลายแหล่ง อาจมีทางเดินบางส่วนที่ไม่ถูกต้อง หรือข้อมูลล้าสมัยซึ่งต่อมาได้มีการพิสูจน์ภายหลังแล้วว่าไม่ถูกต้อง
     </div>
   </div>
 
@@ -115,7 +125,7 @@ button:active{background:#1f1f1f;border-color:#999;}
   </div>
 </div>
 
-<script src="int32Array.js?v=20260131_1118"></script>
+<script src="int32Array.js?v=20260131_1518"></script>
 
 </body>
 </html>
