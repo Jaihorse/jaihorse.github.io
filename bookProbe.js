@@ -196,8 +196,8 @@ function doMove(fm32, to32){
   pc[to] = p;
   pc[fm] = EMPTY;
   // promotion
-  if     (p === L_PWN && to32 <=  3) pc[to] = L_HRS;
-  else if(p === D_PWN && to32 >= 28) pc[to] = D_HRS;
+  if(p === L_PWN && to <   8) pc[to] = L_HRS;
+  if(p === D_PWN && to >= 56) pc[to] = D_HRS;
 }
 
 function doCapture(fm32, to32){

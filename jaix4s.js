@@ -59,16 +59,16 @@ Zobrist key is 64 bits to avoid key duplication.
 const CODE_VERSION = "x4s";
 const DEBUG = false;    // debug mode to disable random
 const USE_BK = true;
-//const useTT = true;   // debug TT use switch
+const useTT = true;   // debug TT use switch
 const BASE_DEPTH = 9;   // depth for level 1, depth 11 takes 5-10 sec per move
 const MAX_LEVEL = 2;
-let level = 1;          // start level
-let targetDepth = BASE_DEPTH;   // actual search depth
+let level = 1, prevLevel = level; // start level
+let targetDepth = BASE_DEPTH;     // actual search depth
 
 /* ===== GAME / PIECE CONSTANTS ===== */
 const GS_LGHT=0, GS_LMOV=1, GS_DARK=2, GS_NONE=3;
 let gameState = GS_LGHT, gameCount = 0, gameStartTime = 0;
-let moveHistoryStr = "", gameResultStr = "";
+let moveHistoryStr = "", gameResultStr = "", winStreak = 0, loseStreak = 0;
 
 const LGHT =0, DARK =1;
 const L_PWN=0, D_PWN=1, L_HRS=2, D_HRS=3, EMPTY=4, NOUSE=5;
@@ -268,9 +268,9 @@ async function startGame() {
   showNewGame(false); showStyleIcon(); await warmUp(500); 
   hideTimers(); await warmUp(500);
 
-  // remove a dark piece for level 0
+  // Dark gives a piece if player lose level 0 
   await showOverlayText("Level "+level, 500);
-  if (level===0) {
+  if (level===0 && prevLevel===0) {
     await showOverlayText("ต่อให้", 250);
     //const cell = pick(8, 10, 12); 
     await animateGivePiece();
@@ -757,7 +757,7 @@ async function animateMove(mv, startX = null, startY = null) {
   const pickX = fmX, pickY = fmY, dropX = toX, dropY = toY;
 
   await initHandCanvas(imgHand, handW, handH);
-  const homeX = 3 * COLW, homeY = -COLW; // Off-screen top left
+  const homeX = (PFILE(toCell) / 2) * COLW, homeY = -COLW; // Off-screen top left
   handX = homeX - handGripX; handY = homeY - handGripY; // hand start ourside board
   await handTo(20, homeX, homeY); // reset hand to home position
 
@@ -1372,21 +1372,19 @@ function cacheForceMove(){
 }
 
 function addMoveToHistory(mv) {
-  moveHistoryStr += moveToStr(mv);
+  moveHistoryStr += mvToStr(mv);
 }
 
-function moveToStr(mv) {
+function mvToStr(mv) {
   const fm = cellToNum[FM(mv)];
   const to = cellToNum[TO(mv)];
   const bits = BITS(mv);
-  let sym = "-";
-  if (bits & MSKIP) return ".";
+  let sym = "-"; //, pmo = "";
+  if (bits & MSKIP) return ". ";
   if (bits & MCAPTURE) sym = "x";
-  if (bits & MPROMOTE) sym = "+";
-  return fm + sym + to + " ";  // e.g. "25-24 24x18 . 18x14 "
+  //if (bits & MPROMOTE) pmo = "+";
+  return fm + sym + to + " ";  // e.g. "25-24 24x18 . 8x4 "
 }
-
-
 
 function getCellFromClientPos(canvas, clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
@@ -1597,19 +1595,43 @@ function myeval(){
   if(pieceCount <= 4) { // egdb for 4 pieces
     updatePieceCode();
     if(pieceCode == 1010) return(0); // both sides 2 hrs draw
-    let score_pc = ((L_HRS_cnt + D_HRS_cnt) * 3) | 0; // score on piece count
+
+    //let score_pc = ((L_HRS_cnt + D_HRS_cnt) * 3) | 0; // score on piece count
+    //let score_pc = 0; // disable score_pc as it's not help 2-Feb-2026
     /*for (let evi = 0; evi < 64; evi++) {
       if (pc[evi] === L_PWN) score_pc += RANK(evi) + 5; // score on RANK
       else if (pc[evi] === D_PWN) score_pc += RANK(63 - evi) + 5;
     }*/
+
+    // 3-Feb-2026, rewrite score for endgame, suggested by chatGpt
+    // score_pc = endgame shaping term (no DTM available)
+    // - Guide fastest win and maximum resistance when egdb gives only W/L/D
+    // - Outcome (±1000) and ply dominate; score_pc must stay small
+    // Components:
+    // 1) Pawn advance bonus: RANK + 5
+    //    - Makes every pawn matter (even unadvanced)
+    //    - Advanced pawns = closer to resolution
+    // 2) Pawn reduction bonus: (4 - totalPawnCnt) * 6
+    //    - Fewer pawns = simpler ending
+    //    - Winning side prefers trades; losing side resists them
+    // 3) Horse-only clarity bonus: +10
+    //    - Helps resolve pawnless H vs H endings
+    //    - Small enough to not override ply
+    // Scale notes:
+    // - score_pc typically stays < ~40
+    // - Must never overpower ±ply or ±1000 outcome
+
+    let score_pc = 0, pawnCnt = 0;
     for (let i = 0; i < 32; i++) {
       const q = pcConv[i], p = pc[q];
       if (p === EMPTY) continue;
       if (p === L_PWN) score_pc += RANK(q) + 5;           // light pawn score
       else if (p === D_PWN) score_pc += RANK(63-q) + 5;      // dark pawn mirrored score
     }
+    score_pc += (4 - L_PWN_cnt - D_PWN_cnt) * 6;
+    if ((L_PWN_cnt | D_PWN_cnt) === 0) score_pc += 10;
 
-    score_pc += 5*ply;
+    //score_pc += 5*ply; // disabled 2-Feb-2026
 
     egProbeCnt++;
     const zkey = egHash(); // 63 bit zobrist
@@ -1796,7 +1818,7 @@ console.log("get s",side,"d",depth,"v",probe.score,"mv",FM(probe.bestMove),TO(pr
     // Can't move
     const ret = MINALPHA + ply;
     // store as exact (or alpha) — heuristically store as exact
-    ttStore(zKey, depth, TT_EXACT, ret, 0);
+    //ttStore(zKey, depth, TT_EXACT, ret, 0); // temp disabled, 3-Feb-2026, test result was better
     return ret;
   }
 
@@ -2044,16 +2066,17 @@ function gameOver(r) { // +1 player won, 0 draw, -1 player lost
   gameResultStr += level + result + " ";
   //console.log(gameCount,level,result,elapsed,gameResultStr,moveHistoryStr);
   //fetch(VISIT_LOG_URL + "level=" + level + "&result=" + result); // log
-  fetch(VISIT_LOG_URL + "level=" + level + 
-      "&result=" + encodeURIComponent(gameResultStr) + 
-      "&moves="  + encodeURIComponent(moveHistoryStr)); // log
+  let url = VISIT_LOG_URL + "level=" + level + "&result=" + encodeURIComponent(gameResultStr);
+  if (level > 0 && result === "W") url += "&moves=" + encodeURIComponent(moveHistoryStr);
+  fetch(url); // log
   const msg = r>0 ? "คุณชนะ" : (r<0 ? "คุณแพ้" : "เสมอกัน");
   message(msg + "!, เริ่มเกมใหม่");
   showOverlay(msg);
   // update level
-  if(r!==0) {
+  /*if(r!==0) {
     level+=r; if(level<0) level=0; if(level>MAX_LEVEL) level=MAX_LEVEL;
-  }
+  }*/
+  updateLevel(r);
   targetDepth = BASE_DEPTH + (level-1);
   if(level<=0) targetDepth = BASE_DEPTH; // safeguard
   gameState = GS_NONE; stopPlayerTimer();
@@ -2070,6 +2093,18 @@ function checkDraw() {
   return false; 
 }
 
+function updateLevel(r) {
+  prevLevel = level;
+  if       (r > 0) { winStreak++; loseStreak=0; }
+  else if  (r < 0) { winStreak=0; loseStreak++; }
+  else             { winStreak=0; loseStreak=0; }
+  if (r > 0 && prevLevel===0) { level=1; winStreak=loseStreak=0; } // win level 0
+  else {
+    if (winStreak === 2) { level++; winStreak =0; }
+    if (loseStreak=== 2) { level--; loseStreak=0; }
+  }
+  level = Math.max(0, Math.min(MAX_LEVEL, level));
+}
 
 /* =================== Timer ==================== */
 let thinkTime = 0;
@@ -2162,7 +2197,7 @@ function initZobrist() {
 const TT_EXACT = 0, TT_ALPHA = 1, TT_BETA = 2;
 
 // ---------- Typed-array TT declarations (replace Map-based TT) ----------
-const TT_POW = 21;                 // 2^21 = 2M entries
+const TT_POW = useTT ? 21 : 8;                 // 2^21 = 2M entries
 const TT_SIZE = 1 << TT_POW;
 const TT_MASK = TT_SIZE - 1;
 let ttHitCnt = 0, ttProbeCnt = 0, ttStoreCnt = 0;
@@ -2176,6 +2211,7 @@ const tt_score = new Int32Array(TT_SIZE);
 const tt_move  = new Int32Array(TT_SIZE);
 
 function ttProbe(key64, depth, alpha, beta) {
+  if (!useTT) return { hit: false, bestMove: 0 };
   //if (!USETT || isEndgame()) return { hit: false, bestMove: 0 };
   ttProbeCnt++;
   //const { hi, lo } = splitKeyTo32(key64);
@@ -2202,7 +2238,7 @@ function ttProbe(key64, depth, alpha, beta) {
 }
 
 function ttStore(key64, depth, flag, score, bestMove) {
-  //if(!useTT) return;
+  if(!useTT) return;
   //if (isEndgame()) return;
   if (pieceCount <= 4) return; // skip if endgame
   //const t0 = performance.now();
@@ -2226,18 +2262,39 @@ function ttStore(key64, depth, flag, score, bestMove) {
     tt_move[idx]  = bestMove | 0;
     return;
   }
-  // otherwise replace if depth >= old depth
-  if (depth >= tt_depth[idx]) {
+
+  const oldKeylo = tt_keylo[idx];
+  const oldKeyhi = tt_keyhi[idx];
+  const oldDepth = tt_depth[idx];
+  const oldFlag  = tt_flag[idx];
+
+  // otherwise, if collision always replace
+  if (oldKeyhi !== hi || oldKeylo !== lo) {
     tt_keylo[idx] = lo;
     tt_keyhi[idx] = hi;
     tt_depth[idx] = depth;
     tt_flag[idx]  = flag;
     tt_score[idx] = score;
     tt_move[idx]  = bestMove | 0;
+    return;
+  }
+
+  // otherwise, replace if deeper and not EXACT. tested 3-Feb-2026 and result was better
+  if (oldKeyhi === hi && oldKeylo === lo) {
+    if (depth <= oldDepth) return; // not deeper
+    if (flag === TT_EXACT) return; // exact not allow to replace
+    if (oldFlag === TT_EXACT) return; // old flag is already exact
+    // replace existing data
+    tt_depth[idx] = depth;
+    tt_flag[idx]  = flag;
+    tt_score[idx] = score;
+    tt_move[idx]  = bestMove | 0;
+    return;
   }
 }
 
 function ttHash() { // for TT
+  if (!useTT) return 0n;
   const zp = zobrist_piece; //const conv = pcConv; // local alias
   let h = 0n;
   for (let i = 0; i < 32; i++) {
