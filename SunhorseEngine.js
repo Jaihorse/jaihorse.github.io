@@ -38,6 +38,32 @@ function drawBoard() {
   }
 }
 
+async function getGoogleAIMove() {
+  const response = await fakeGoogleAiApi(board); 
+  if (response && response.move) {
+    const { from, to } = response.move;
+    doMove(from, to);
+  }
+}
+
+function doMove(fromIndex, toIndex) {
+  board[toIndex] = board[fromIndex];
+  board[fromIndex] = 0;
+  drawBoard();
+}
+
+function fakeGoogleAiApi(currentBoard) {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const myPieces = currentBoard.map((val, idx) => val === 2 ? idx : -1).filter(idx => idx !== -1);
+      const randomStart = myPieces[Math.floor(Math.random() * myPieces.length)];
+      resolve({
+        move: { from: randomStart, to: randomStart + 8 }
+      });
+    }, 1000);
+  });
+}
+
 let neutonLayer1 = Uint32Array() [
    601627888, 2728506149, 4138808047, 4172626265,
     83772949,  899500947, 1911190145, 4293703031,
@@ -342,7 +368,6 @@ function aiMove(){
 }
 
 function legalMovesCPU(){
-  // minimal fake logic: CPU pieces move down-left/down-right if empty
   const m = [];
   for (let i=0;i<64;i++){
     if (board[i]===2){
