@@ -12,24 +12,20 @@
 
   <style>
     html,body {
-      margin:0; padding:0;
-      width:100vw; height:100vh;
-      overflow:hidden;
+      margin:0; padding:0; width:100vw; height:100vh; overflow:hidden;
       background:#678 url(linen.jpg) repeat;
       font-family:'Prompt',sans-serif; font-weight:300; color:#eee; text-align:center;
     }
 
-    body { font-size: clamp(10px, 3.5vmin, 28px); }
-    #topCenter { font-size: clamp(18px, 6vmin, 42px); }
-    #version, #footer, #topRight, #newgame { font-size: clamp( 9px, 3vmin, 24px); }
-    #cellNumSwitch { font-size: clamp( 6px, 2vmin, 18px); }
+    body                                 { font-size: clamp(10px,3.5vmin, 28px); }
+    #topCenter                           { font-size: clamp(18px,  6vmin, 42px); }
+    #qaBox, #footer, #newgame, #topRight { font-size: clamp( 9px,  3vmin, 24px); }
+    #version                             { font-size: clamp( 7px,2.5vmin, 21px); }
+    small, #cellNumSwitch                { font-size: clamp( 6px,  2vmin, 18px); }
 
     #topBar,#bottomBar {
-      display:flex;
-      justify-content:space-between;
-      align-items:baseline;
-      width:min(90vw,80vh);
-      margin:0 auto;
+      display:flex; justify-content:space-between; align-items:baseline;
+      width:min(90vw,80vh); margin:0 auto;
     }
 
     #bottomBar { padding-top: 1.5vmin; }
@@ -45,28 +41,22 @@
 
     #newgame {
       visibility:hidden;
-      padding: 0 5px;
-      border-radius: 5px;
-      background: #eee;
-      color: #555;
+      padding: 0 5px; border-radius: 5px; background: #eee; color: #555;
       cursor: pointer;
     }
     #newgame.disabled { opacity: 0.4; pointer-events: none; }
     #newgame:hover{ background:#ddd; color:#333; }
     
     canvas {
-      margin:5px auto 0 auto;
-      background: none;
+      margin:5px auto 0 auto; background: none;
       /*width:min(90vw,95vh); aspect-ratio:1;*/
       touch-action:none; user-select:none;
-      display:block;
-      position:absolute; top:0; left:0
+      display:block; position:absolute; top:0; left:0
     }
 
     #boardWrapper {
       position: relative;
-      margin: 0 auto;    /* centers horizontally */
-      width:min(90vw,95vh); aspect-ratio:1;
+      margin: 0 auto; width:min(90vw,95vh); aspect-ratio:1;
       display: block;
     }
 
@@ -75,6 +65,9 @@
       vertical-align: middle; margin-left: 1px;
       cursor: pointer;
     }
+
+    .cellnum { font-size:.6em; color:#eee; }
+    .cellnum.off { color:#aaa; }
 
     .overlay-text {
       z-index: 3; position: absolute; inset: 0;
@@ -86,11 +79,36 @@
       pointer-events: none;
     }
 
-    .overlay-text.show {
-      opacity: 1;
+    .overlay-text.show { opacity: 1; }
+
+    #qaLink{text-decoration:none;cursor:pointer;color:#ddd}
+    /*#qaLink:hover{text-decoration:underline;color:#fff}*/
+
+    #qa{
+      position:fixed; inset:0; background:rgba(0,0,0,.55);
+      display:flex; align-items:center; justify-content:center;
+      opacity:0; pointer-events:none; transition:.25s; z-index:10;
     }
+    #qa:target{opacity:1;pointer-events:auto}
+    #qaBox{
+      position: relative; width: 85%; max-width: none; /*font-size: 0.8em;*/
+      background: rgba(120,130,140,.35);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      border: 1px solid rgba(255,255,255,.15);
+    }
+    #qaBox h2{text-align:center;margin-top:0}
+    #qaBox h3{margin:.5em 0 .2em;color:#fff}
+    #qaBox p{margin:0;color:#ddd}
+    #qaClose{
+      position:absolute; top:1.2vmin; right:1.4vmin;
+      font-size:1.2em; line-height:1; color:#eee; text-decoration:none;
+      opacity:.7;
+    }
+    #qaClose:hover{ opacity:1; }
 
     #debug{ font-size:12px; color:#ddd; }
+
   </style>
 </head>
 
@@ -104,7 +122,8 @@
       </span>
       <span id="topCenter">Sunhorse</span>
       <span id="topRight">
-        <span id="version">&nbsp;</span>
+        <span id="version">ข้อมูลเพิ่มเติม กด</span>
+        <a href="#qa" id="qaLink">ⓘ</a>
       </span>
     </div>
 
@@ -132,7 +151,7 @@
     <!--div><span id="footer">&nbsp;</span></div-->
   </div>
 
-  <script src="WindowResize4s.js?v=1920x1080x20260126"></script>
+  <script src="WindowResize4s.js?v=1920x1080x020316"></script>
   <script>
     // Resize handler to ensure board stays centered even in frame
     function adjustPageSize() {
@@ -142,5 +161,25 @@
     window.addEventListener("resize", adjustPageSize);
     adjustPageSize(); // run once on load
   </script>
+
+  <div id="qa">
+    <div id="qaBox">
+      <a id="qaClose" href="#">✕</a>
+
+        <h3>🕹️ วิธีเล่น</h3>
+        <p>ลากตัวเดิน หรือคลิกตัวเดินแล้วคลิกจุดหมาย ระดับเปลี่ยนเมื่อชนะหรือแพ้ติดกัน 🔈:เปิดปิดเสียง <small>123</small>:ซ่อนตัวเลขบนกระดาน 🔘:คลิกเบี้ยมุมล่างซ้ายเปลี่ยนตัวเบี้ย</p>
+
+        <h3>🕰️ ที่มาที่ไป</h3>
+        <p>ย่อส่วนมาจาก Jaihorse โปรแกรมตำนานที่เขียนขึ้นเมื่อ 35 ปีก่อนที่ญี่ปุ่น และให้เล่นฟรีที่ makhos.com ก่อนปิดตัวไปนาน ไม่นานมานี้ไปรื้อเจอในฮาร์ดดิสก์เก่าที่เกือบจะทิ้งไปแล้ว ลองให้ผู้รู้ทดลองเล่นเห็นว่ายังพอใช้ได้ จึงนำกลับมาให้ได้เล่นสนุกกันอีกครั้ง</p>
+
+        <h3>⚙️ ทำไมไม่เก่งเท่าโปรแกรมอื่น</h3>
+        <p>เขียนมาเล่นบนเว็บโดยเฉพาะ ไม่ใช่แอปติดตั้ง จึงใช้ทรัพยากรได้จำกัดมากๆ ทำให้คิดล่วงหน้าได้ไม่กี่ตา  ได้ปรับจูนให้เดินที่ดีที่สุดเท่าที่จะเอื้ออำนวยแล้ว ยังแอบสุ่มทางเดินในบางจังหวะ ให้เหมือนคนที่เบลอหรือเดินพลาดบ้าง</p>
+
+        <h3>👌 เหมาะกับใคร</h3>
+        <p>เหมาะสำหรับคนทั่วไปที่เน้นเล่นสนุกยามว่าง แต่อาจไม่ตอบโจทย์ระดับเซียนที่ต้องการความแม่นยำขั้นสูง จุดเด่นคือความสะดวก เล่นได้ทันทีทุกที่ทุกเวลา จะไอแพดน้อง มือถือเพื่อน คอมที่ทำงาน เพียงเข้าเว็บก็เล่นได้เลย</p>
+
+    </div>
+  </div>
+
 </body>
 </html>
