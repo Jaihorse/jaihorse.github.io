@@ -44,6 +44,7 @@ x4q Feb-2026 fixed search, tt, eg, eval score
 "use strict";
 
 const CODE_VERSION = "x4q";
+const CODE_DATE = "2602061645";
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
@@ -242,7 +243,8 @@ function waitForAssets() { // wait for images, egdb, and bkdb loading complete
   if (!imagesLoaded || egdbLoaded===0 || bkdbLoaded===0) { 
     setTimeout(waitForAssets, 200); return; 
   }
-  fetch(VISIT_LOG_URL + "level=1&result="+egdbLoaded+"&moves="+bkdbLoaded);
+  fetch(VISIT_LOG_URL + "level=" + CODE_DATE + "&result=" +
+      egdbLoaded + "&moves=" + bkdbLoaded);
   startGame();
 }
 
