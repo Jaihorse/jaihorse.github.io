@@ -33,6 +33,12 @@ Technical Notes:
 Use Zobrist key for both TT and Endgame DB.
 Zobrist key is 64 bits to avoid key duplication.
 
+VERSTIONS
+----------
+x4h Dec-2025 hand animation
+x4s Jan-2026 sound
+x4q Feb-2026 fixed search, tt, eg, eval score
+
 */
 
 "use strict";
@@ -1616,7 +1622,15 @@ function myeval(){
     const zkey = egHash(); // 63 bit zobrist
     const dval = egProbe(zkey);
 
-//console.log("z", zkey.toString(36),"side",side,"ply",ply,"val",dval);
+    // COMLEXITY STYLES: level 0 draw quick, level 2 stubborn to draw
+    let drawBias = 0;
+    if (level === 0 || level >= 2) {
+      const bal = (L_PWN_cnt + L_HRS_cnt) - (D_PWN_cnt + D_HRS_cnt);
+      let sign = (level === 0) ? -1 : Math.sign(side_is_L ? bal : -bal);
+      if (sign === 0) sign = -1;
+      drawBias = sign * score_pc;
+    }
+
     if (dval !== 0) {
 //console.log(boardToText());
 //console.log("z", zkey.toString(36),"s",side,"ply",ply,"v",dval);
@@ -1624,17 +1638,18 @@ function myeval(){
 //console.log(boardToText());
 
       egHitCnt++;
-      if (dval === 2) return side_is_L ?  1000 - score_pc - ply : -1000 + score_pc + ply;
-      if (dval === 3) return side_is_L ? -1000 + score_pc + ply :  1000 - score_pc - ply;
-      if (dval === 1) return side_is_L ?         score_pc       :        -score_pc;
+      if (dval === EG_W) return side_is_L ?  1000 - score_pc - ply : -1000 + score_pc + ply;
+      if (dval === EG_L) return side_is_L ? -1000 + score_pc + ply :  1000 - score_pc - ply;
+      //if (dval === EG_D) return side_is_L ?         score_pc       :        -score_pc;
+      if (dval === EG_D) return side_is_L ? drawBias : -drawBias;
     }
     // fallback if no rec in egdb
     const xval = getdx(pieceCode);
 //console.log("no db, code",pieceCode,"xval",xval);
-    if (xval === 2) return side_is_L ?  1000 - score_pc - ply : -1000 + score_pc + ply;
-    if (xval === 3) return side_is_L ? -1000 + score_pc + ply :  1000 - score_pc - ply;
-    if (xval === 1) return side_is_L ?         score_pc       :       -score_pc;
-    //console.log("BUG code", pieceCode);
+    if (xval === EG_W) return side_is_L ?  1000 - score_pc - ply : -1000 + score_pc + ply;
+    if (xval === EG_L) return side_is_L ? -1000 + score_pc + ply :  1000 - score_pc - ply;
+    //if (xval === EG_D) return side_is_L ?         score_pc       :       -score_pc;
+    if (xval === EG_D) return side_is_L ? drawBias : -drawBias;
   }
 
   // === Piece Count Bonus ===
@@ -2396,7 +2411,12 @@ v2fv11.
 
 read file, restore y, conv to pc[], create zorist key
 -----------------------------------------------------*/
+const EG_D = 1;  // draw
+const EG_W = 2;  // light win
+const EG_L = 3;  // light loss
+
 let egdbLoaded = 0;
+const egStats = new Map(); // key = pieceCode, value = { win:0, draw:0, loss:0, total:0, def:0 }
 
 // typed arrays
 const EG_POW = 21; // 2M
@@ -2498,7 +2518,7 @@ async function loadEGDB(zipUrl="background2.jpg", innerFile="description2.txt") 
       .filter(l => l && !l.startsWith('#'));
 
     for (const line of lines) {
-      const mapVal = { '.':1, '+':2, '-':3 };
+      const mapVal = { '.':EG_D, '+':EG_W, '-':EG_L };
       const value = mapVal[line[line.length-1]] || 0;
       const rleDb = line.substring(0, line.length-1);
       const fullDb = expandRLE(rleDb);
