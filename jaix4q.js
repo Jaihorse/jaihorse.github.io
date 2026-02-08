@@ -44,7 +44,7 @@ x4q Feb-2026 fixed search, tt, eg, eval score
 "use strict";
 
 const CODE_VERSION = "x4q";
-const CODE_DATE = "2602061645";
+const CODE_DATE = "2602081445";
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
@@ -405,7 +405,7 @@ const imageFiles = [
     "wL_ico.png", "wD_ico.png", "selBlack.png", "selBlack.png" ],
   // checkers (2)
   [ "cLPWN256_64.png","cDPWN256_64.png","cLHRS256_64.png","cDHRS256_64.png",
-    "brddrk.jpg","brdwht.jpg",
+    "cBDRK.jpg","cBWHT.jpg",
     //"cLPWNmov_64.png","cDPWNmov_64.png","cLHRSmov_64.png","cDHRSmov_64.png",
     //"cLPWN256_64.png","cDPWN256_64.png","cLHRS256_64.png","cDHRS256_64.png",
     "cL_ico.png", "cD_ico.png", "selBlack.png", "selBlack.png" ],
