@@ -44,7 +44,7 @@ x4q Feb-2026 fixed search, tt, eg, eval score
 "use strict";
 
 const CODE_VERSION = "x4q";
-const CODE_DATE = "2602081445";
+const CODE_DATE = "2602090830";
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
