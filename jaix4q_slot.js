@@ -426,7 +426,7 @@ const imageFiles = [
     "wL_ico.png", "wD_ico.png", "selBlack.png", "selBlack.png" ],
   // checkers (2)
   [ "cLPWN256_64.png","cDPWN256_64.png","cLHRS256_64.png","cDHRS256_64.png",
-    "brddrk.jpg","brdwht.jpg",
+    "cBDRK.jpg","cBWHT.jpg",
     //"cLPWNmov_64.png","cDPWNmov_64.png","cLHRSmov_64.png","cDHRSmov_64.png",
     //"cLPWN256_64.png","cDPWN256_64.png","cLHRS256_64.png","cDHRS256_64.png",
     "cL_ico.png", "cD_ico.png", "selBlack.png", "selBlack.png" ],
@@ -471,9 +471,9 @@ function initDomRefs(){
   pieceCtx     = pieceCanvas.getContext("2d");
   animeCanvas  = $("animeCanvas");
   animeCtx     = animeCanvas.getContext("2d");
-
   handCanvas   = doc.createElement("canvas");
   handCtx      = handCanvas.getContext("2d");
+
   messageElm   = $("message");
   titleElm     = $("topCenter");
   versionElm   = $("version");
@@ -487,7 +487,7 @@ function initDomRefs(){
   playerTimeElm= $("playerTime");
   overlayText  = $("overlayText");
   showNewGame(false); showStyleIconIcon(false);
-  soundElm.textContent = "🔈";
+  //soundElm.textContent = "🔈";
   //pieceCtx.imageSmoothingEnabled = false;
   animeCtx.imageSmoothingEnabled = false;
   handCtx.imageSmoothingEnabled = false;
@@ -1548,7 +1548,7 @@ function playSound(type, ms = null) {
   const src = audioCtx.createBufferSource();
   const gain = audioCtx.createGain();
   let rate = 1;
-  let volume = vary(SOUND_VOLUME);
+  let volume = vary(soundVolume);
   if (type === SOUND_MOV && ms > 0) rate = buffer.duration * 1000 / ms;
 
   src.buffer = buffer;
@@ -1572,15 +1572,16 @@ function unlockSound() {
 }
 
 let soundEnabled = false, soundLevel = 0; // 0=🔈 muted, 1=🔉 medium, 2=🔊 loud
-let SOUND_VOLUME = 0.5;
+let soundVolume = 0.5;
+const speakerImgs = ["speaker0.png", "speaker1.png", "speaker2.png"];
+const speakerVols  = [0, 0.3, 0.5];
 
 async function toggleSound() {
   if (!soundUnlocked) await unlockSound();
-  soundEnabled = true;
   soundLevel = (soundLevel + 1) % 3;
-  if      (soundLevel === 0) { soundElm.textContent = "🔈"; soundEnabled = false; } 
-  else if (soundLevel === 1) { soundElm.textContent = "🔉"; SOUND_VOLUME = 0.3; } 
-  else                       { soundElm.textContent = "🔊"; SOUND_VOLUME = 0.5; }
+  soundEnabled = soundLevel !== 0;
+  soundVolume  = speakerVols[soundLevel];
+  soundElm.src = speakerImgs[soundLevel];
 }
 
 function vary(base, amount = 0.25) { return base * (1 + (Math.random() * 2 - 1) * amount); }
