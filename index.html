@@ -17,17 +17,33 @@
       font-family:'Prompt',sans-serif; font-weight:300; color:#eee; text-align:center;
     }
 
-    body                                 { font-size: clamp(10px,3.5vmin, 28px); }
-    #topCenter                           { font-size: clamp(18px,  6vmin, 42px); }
-    #qaBox, #footer, #newgame, #topRight { font-size: clamp( 9px,  3vmin, 24px); }
-    #version                             { font-size: clamp( 7px,2.5vmin, 21px); }
-    small, #cellNumSwitch                { font-size: clamp( 6px,  2vmin, 18px); }
-
-    #topBar,#bottomBar {
-      display:flex; justify-content:space-between; align-items:baseline;
-      width:min(90vw,80vh); margin:0 auto;
+    body {
+      -webkit-user-select: none; user-select: none; touch-action:none; 
+      -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
     }
 
+    #stageWrapper{
+      position:relative; display:flex; flex-direction: column; align-items:center;
+      width:100vw; /*margin:0 auto; */
+    }
+
+    #extendWrapper {
+      position: absolute; display: block; width:100vw; margin:0 auto;
+    }
+
+    #boardWrapper {
+      position: relative; display: block; width:100vw; margin:0 auto;
+    }
+
+    canvas {
+      position:absolute; top:0; display:block; 
+      margin:0; background:none; /*touch-action:none; user-select:none;*/
+    }
+
+    #topBar,#bottomBar {
+      position:relative; width:min(90vw,80vh); margin:0 auto;
+      display:flex; justify-content:space-between; align-items:baseline;
+    }
     #bottomBar { padding-top: 1.5vmin; }
 
     #topLeft, #topCenter, #topRight { flex-grow: 1; flex-basis: 0; }
@@ -46,22 +62,9 @@
     }
     #newgame.disabled { opacity: 0.4; pointer-events: none; }
     #newgame:hover{ background:#ddd; color:#333; }
-    
-    canvas {
-      margin:5px auto 0 auto; background: none;
-      /*width:min(90vw,95vh); aspect-ratio:1;*/
-      touch-action:none; user-select:none;
-      display:block; position:absolute; top:0; left:0
-    }
-
-    #boardWrapper {
-      position: relative;
-      margin: 0 auto; width:min(90vw,95vh); aspect-ratio:1;
-      display: block;
-    }
 
     #styleSwitch, #styleComp, #soundSwitch, #cellNumSwitch {
-      display:inline; height: 3vh; 
+      display:inline; height: 3.5vmin; 
       vertical-align: middle; margin-left: 1px;
       cursor: pointer;
     }
@@ -70,20 +73,15 @@
     .cellnum.off { color:#aaa; }
 
     .overlay-text {
-      z-index: 3; position: absolute; inset: 0;
-      /*background: rgba(200, 200, 200, 0.2);*/
-      display: flex;
-      align-items: center; justify-content: center;
+      z-index:5; position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
       font-size: 10vmin; color: #ccc; text-shadow: 0 2px 6px rgba(0,0,0,0.6);
       opacity: 0; transition: opacity 250ms ease;
       pointer-events: none;
     }
-
     .overlay-text.show { opacity: 1; }
 
     #qaLink{text-decoration:none;cursor:pointer;color:#ddd}
-    /*#qaLink:hover{text-decoration:underline;color:#fff}*/
-
     #qa{
       position:fixed; inset:0; background:rgba(0,0,0,.55);
       display:flex; align-items:center; justify-content:center;
@@ -109,11 +107,27 @@
 
     #debug{ font-size:12px; color:#ddd; }
 
+
+    /***** FONT *****/
+    body                                 { font-size: clamp(5px,3.5vmin, 28px); }
+    #topCenter                           { font-size: clamp(9px,  5vmin, 42px); }
+    #qaBox, #footer, #newgame, #topRight { font-size: clamp(4px,  3vmin, 24px); }
+    #version                             { font-size: clamp(3px,2.5vmin, 21px); }
+    small, #cellNumSwitch                { font-size: clamp(3px,  2vmin, 18px); }
+
+
+
   </style>
 </head>
 
 <body onload="init()">
-  <div class="page">
+
+  <div id="stageWrapper">
+
+    <div id="extendWrapper">
+      <canvas id="animeCanvas" style="z-index:3; pointer-events:none;"></canvas>
+      <canvas id="pieceCanvas" style="z-index:2; pointer-events:none;"></canvas>
+    </div>
 
     <div id="topBar">
       <span id="topLeft">
@@ -128,9 +142,8 @@
     </div>
 
     <div id="boardWrapper">
-      <canvas id="boardCanvas" style="z-index:0; pointer-events:none;"></canvas>
-      <canvas id="pieceCanvas" style="z-index:1;"></canvas>
-      <canvas id="animeCanvas" style="z-index:2; pointer-events:none;"></canvas>
+      <canvas id="boardCanvas" style="z-index:1;"></canvas>
+
       <div id="overlayText" class="overlay-text"></div>
     </div>
 
@@ -139,7 +152,7 @@
         <img id="styleSwitch" />
         <span id="playerTime">&nbsp;</span>
       </span>
-      <span id="message">by Jaroonsak Wangviwat</span>
+      <span id="message"></span>
       <span id="bottomRight">
         <span id="newgame">ยอม</span>
         <!--img id="styleSwitch" /-->
@@ -148,11 +161,13 @@
       </span>
     </div>
 
+
+    <!--div id="vignetteOuter"></div-->
     <!--div><span id="footer">&nbsp;</span></div-->
   </div>
 
-  <script src="WindowResize4q.js?v=1920x1080x0208"></script>
-  <script>
+  <script src="WindowResize4sl.js?t=0215>"></script>
+  <!--script>
     // Resize handler to ensure board stays centered even in frame
     function adjustPageSize() {
       document.body.style.height = window.innerHeight + "px";
@@ -160,7 +175,7 @@
     }
     window.addEventListener("resize", adjustPageSize);
     adjustPageSize(); // run once on load
-  </script>
+  </script-->
 
   <div id="qa">
     <div id="qaBox">
@@ -172,7 +187,7 @@
         <h3>🕰️ ที่มาที่ไป</h3>
         <p>ย่อส่วนมาจาก Jaihorse โปรแกรมตำนานที่เขียนขึ้นเมื่อ 35 ปีก่อนที่ญี่ปุ่น และให้เล่นฟรีที่ makhos.com ก่อนปิดตัวไปนาน ไม่นานมานี้ไปรื้อเจอในฮาร์ดดิสก์เก่าที่เกือบจะทิ้งไปแล้ว ลองให้ผู้รู้ทดลองเล่นเห็นว่ายังพอใช้ได้ จึงนำกลับมาให้ได้เล่นสนุกกันอีกครั้ง</p>
 
-        <h3>⚙️ ทำไมไม่เก่งเท่าโปรแกรมอื่น</h3>
+        <h3>⚙️ ทำไมถึงเดินไม่เก่งเท่าโปรแกรมอื่น</h3>
         <p>เขียนมาเล่นบนเว็บโดยเฉพาะ ไม่ใช่แอปติดตั้ง จึงใช้ทรัพยากรได้จำกัดมากๆ ทำให้คิดล่วงหน้าได้ไม่กี่ตา  ได้ปรับจูนให้เดินที่ดีที่สุดเท่าที่จะเอื้ออำนวยแล้ว ยังแอบสุ่มทางเดินในบางจังหวะ ให้เหมือนคนที่เบลอหรือเดินพลาดบ้าง</p>
 
         <h3>👌 เหมาะกับใคร</h3>
