@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="keywords" content="checkers, jaihorse, makhos, sunhorse">
+  <title>Sunhorse</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="SunhorseEngine.js" type="text/plain"></script>
+
+  <style>
+    html,body {
+      margin:0; padding:0; width:100vw; height:100vh; overflow:hidden;
+      background:#678 url(linen.jpg) repeat;
+      font-family:'Prompt',sans-serif; font-weight:300; color:#eee; text-align:center;
+    }
+
+    body {
+      -webkit-user-select: none; user-select: none; touch-action:none; 
+      -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    }
+
+    #stageWrapper{
+      position:relative; display:flex; flex-direction: column; align-items:center;
+      width:100vw; /*margin:0 auto; */
+    }
+
+    #extendWrapper {
+      position: absolute; display: block; width:100vw; margin:0 auto;
+    }
+
+    #boardWrapper {
+      position: relative; display: block; width:100vw; margin:0 auto;
+    }
+
+    canvas {
+      position:absolute; top:0; display:block; 
+      margin:0; background:none; /*touch-action:none; user-select:none;*/
+    }
+
+    #topBar,#bottomBar {
+      position:relative; width:min(90vw,80vh); margin:0 auto;
+      display:flex; justify-content:space-between; align-items:baseline;
+    }
+    #bottomBar { padding-top: 1.5vmin; }
+
+    #topLeft, #topCenter, #topRight { flex-grow: 1; flex-basis: 0; }
+    #bottomLeft, #message, #bottomRight { flex-grow: 0; }
+
+    #topLeft, #bottomLeft { text-align: left; min-width: 15%; }
+    #topCenter, #message  { text-align: center; margin-bottom: -1vh; }
+    #topRight, #newgame   { text-align: right; }
+    #topRight, #cellNumSwitch { color: #aaa; }
+    #bottomRight { text-align: right; min-width: 10%; }
+
+    #newgame {
+      visibility:hidden;
+      padding: 0 5px; border-radius: 5px; background: #eee; color: #555;
+      cursor: pointer;
+    }
+    #newgame.disabled { opacity: 0.4; pointer-events: none; }
+    #newgame:hover{ background:#ddd; color:#333; }
+
+    #styleSwitch, #styleComp, #soundSwitch, #cellNumSwitch {
+      display:inline; height: 3.5vmin; 
+      vertical-align: middle; margin-left: 1px;
+      cursor: pointer;
+    }
+
+    .cellnum { font-size:.6em; color:#eee; }
+    .cellnum.off { color:#aaa; }
+
+    .overlay-text {
+      z-index:5; position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10vmin; color: #ccc; text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+      opacity: 0; transition: opacity 250ms ease;
+      pointer-events: none;
+    }
+    .overlay-text.show { opacity: 1; }
+
+    /*
+    #vignetteOuter{
+      z-index:4; position:absolute; inset:0; 
+      background: radial-gradient(
+        circle at center,
+        rgba(0,0,0,0) 40%,
+        rgba(0,0,0,0.1) 75%,
+        rgba(0,0,0,0.2) 85%,
+        rgba(0,0,0,0.3) 100% 
+      );
+      pointer-events:none;
+    }
+    */
+
+    #qaLink{text-decoration:none;cursor:pointer;color:#ddd}
+    #qa{
+      position:fixed; inset:0; background:rgba(0,0,0,.55);
+      display:flex; align-items:center; justify-content:center;
+      opacity:0; pointer-events:none; transition:.25s; z-index:10;
+    }
+    #qa:target{opacity:1;pointer-events:auto}
+    #qaBox{
+      position: relative; width: 85%; max-width: none; /*font-size: 0.8em;*/
+      background: rgba(120,130,140,.35);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      border: 1px solid rgba(255,255,255,.15);
+    }
+    #qaBox h2{text-align:center;margin-top:0}
+    #qaBox h3{margin:.5em 0 .2em;color:#fff}
+    #qaBox p{margin:0;color:#ddd}
+    #qaClose{
+      position:absolute; top:1.2vmin; right:1.4vmin;
+      font-size:1.2em; line-height:1; color:#eee; text-decoration:none;
+      opacity:.7;
+    }
+    #qaClose:hover{ opacity:1; }
+
+    #debug{ font-size:12px; color:#ddd; }
+
+
+    /***** FONT *****/
+    body                                 { font-size: clamp(5px,3.5vmin, 28px); }
+    #topCenter                           { font-size: clamp(9px,  5vmin, 42px); }
+    #qaBox, #footer, #newgame, #topRight { font-size: clamp(4px,  3vmin, 24px); }
+    #version                             { font-size: clamp(3px,2.5vmin, 21px); }
+    small, #cellNumSwitch                { font-size: clamp(3px,  2vmin, 18px); }
+
+
+
+  </style>
+</head>
+
+<body onload="init()">
+
+  <div id="stageWrapper">
+
+    <div id="extendWrapper">
+      <canvas id="animeCanvas" style="z-index:3; pointer-events:none;"></canvas>
+      <canvas id="pieceCanvas" style="z-index:2; pointer-events:none;"></canvas>
+    </div>
+
+    <div id="topBar">
+      <span id="topLeft">
+        <img id="styleComp" />
+        <span id="compTime">&nbsp;</span>
+      </span>
+      <span id="topCenter">Sunhorse</span>
+      <span id="topRight">
+        <span id="version">ข้อมูลเพิ่มเติม กด</span>
+        <a href="#qa" id="qaLink">ⓘ</a>
+      </span>
+    </div>
+
+    <div id="boardWrapper">
+      <canvas id="boardCanvas" style="z-index:1;"></canvas>
+
+      <div id="overlayText" class="overlay-text"></div>
+    </div>
+
+    <div id="bottomBar">
+      <span id="bottomLeft">
+        <img id="styleSwitch" />
+        <span id="playerTime">&nbsp;</span>
+      </span>
+      <span id="message"></span>
+      <span id="bottomRight">
+        <span id="newgame">ยอม</span>
+        <!--img id="styleSwitch" /-->
+        <span id="cellNumSwitch">123</span>
+        <span id="soundSwitch">&nbsp;</span>
+      </span>
+    </div>
+
+
+    <!--div id="vignetteOuter"></div-->
+    <!--div><span id="footer">&nbsp;</span></div-->
+  </div>
+
+  <script src="jaix4q_slot.js?t=<?= substr(time(), -2) ?>"></script>
+  <!--script>
+    // Resize handler to ensure board stays centered even in frame
+    function adjustPageSize() {
+      document.body.style.height = window.innerHeight + "px";
+      document.body.style.width  = window.innerWidth + "px";
+    }
+    window.addEventListener("resize", adjustPageSize);
+    adjustPageSize(); // run once on load
+  </script-->
+
+  <div id="qa">
+    <div id="qaBox">
+      <a id="qaClose" href="#">✕</a>
+
+        <h3>🕹️ วิธีเล่น</h3>
+        <p>ลากตัวเดิน หรือคลิกตัวเดินแล้วคลิกจุดหมาย ระดับเปลี่ยนเมื่อชนะหรือแพ้ติดกัน 🔈:เปิดปิดเสียง <small>123</small>:ซ่อนตัวเลขบนกระดาน 🔘:คลิกเบี้ยมุมล่างซ้ายเปลี่ยนตัวเบี้ย</p>
+
+        <h3>🕰️ ที่มาที่ไป</h3>
+        <p>ย่อส่วนมาจาก Jaihorse โปรแกรมตำนานที่เขียนขึ้นเมื่อ 35 ปีก่อนที่ญี่ปุ่น และให้เล่นฟรีที่ makhos.com ก่อนปิดตัวไปนาน ไม่นานมานี้ไปรื้อเจอในฮาร์ดดิสก์เก่าที่เกือบจะทิ้งไปแล้ว ลองให้ผู้รู้ทดลองเล่นเห็นว่ายังพอใช้ได้ จึงนำกลับมาให้ได้เล่นสนุกกันอีกครั้ง</p>
+
+        <h3>⚙️ ทำไมถึงเดินไม่เก่งเท่าโปรแกรมอื่น</h3>
+        <p>เขียนมาเล่นบนเว็บโดยเฉพาะ ไม่ใช่แอปติดตั้ง จึงใช้ทรัพยากรได้จำกัดมากๆ ทำให้คิดล่วงหน้าได้ไม่กี่ตา  ได้ปรับจูนให้เดินที่ดีที่สุดเท่าที่จะเอื้ออำนวยแล้ว ยังแอบสุ่มทางเดินในบางจังหวะ ให้เหมือนคนที่เบลอหรือเดินพลาดบ้าง</p>
+
+        <h3>👌 เหมาะกับใคร</h3>
+        <p>เหมาะสำหรับคนทั่วไปที่เน้นเล่นสนุกยามว่าง แต่อาจไม่ตอบโจทย์ระดับเซียนที่ต้องการความแม่นยำขั้นสูง จุดเด่นคือความสะดวก เล่นได้ทันทีทุกที่ทุกเวลา จะไอแพดน้อง มือถือเพื่อน คอมที่ทำงาน เพียงเข้าเว็บก็เล่นได้เลย</p>
+
+    </div>
+  </div>
+
+</body>
+</html>
