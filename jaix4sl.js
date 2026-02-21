@@ -38,7 +38,7 @@ Zobrist key is 64 bits to avoid key duplication.
 "use strict";
 
 const CODE_VERSION = "x4sl";
-const CODE_DATE = "SL0215";
+const CODE_DATE = "SL0220";
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
@@ -263,7 +263,8 @@ function waitForAssets() { // wait for images, egdb, and bkdb loading complete
 async function startGame() {
   bCompBusy = true;
   gameStartTime = performance.now(); 
-  gameCount++; compFirst = !(gameCount & 1); moveHistoryStr = "";
+  gameCount++; curBestScore = -9999;
+  compFirst = !(gameCount & 1); moveHistoryStr = "";
   initEngineState(); initCellOffsets();
   pieceSelected = false; selectedCell = -1; selectedTo = -1;
   dragX = dragY = 0; wasDragging = false;
@@ -393,6 +394,8 @@ function pick(a,b,c){
   return r < 0.3 ? a : r < 0.7 ? b : c;
 }
 
+function vary(base, amount = 0.25) { return base * (1 + (Math.random() * 2 - 1) * amount); }
+function randSym(range) { return (Math.random() * 2 - 1) * range; }
 
 /***************** RENDER & INPUT ********************
  
@@ -414,7 +417,7 @@ const L_ICO=6,D_ICO=7,SEL_BLACK=8,SEL_WHITE=9,PMOV_SHIFT=0; //(L_PWN_MOV-L_PWN);
 const imageFiles = [
   // classic (0)
   [ "mLPWN256_128.png","mDPWN256_128.png","mLHRS256_128.png","mDHRS256_128.png",
-    "brddrk.jpg","brdwht.jpg",
+    "brddrk160.jpg","brdwht160.jpg",
     //"mLPWNmov_64.png","mDPWNmov_64.png","mLHRSmov_64.png","mDHRSmov_64.png",
     //"mLPWN256_128.png","mDPWN256_128.png","mLHRS256_128.png","mDHRS256_128.png",
     "mL_ico.png", "mD_ico.png", "selBlack.png", "selWhite.png" ],
@@ -458,6 +461,7 @@ let DPR=1, SQPX=1, OFFX=0, OFFY=0;
 // each cell position with some error
 let cellX = new Int16Array(64), cellY = new Int16Array(64);
 let cellErrX = [], cellErrY = []; // small offsets of each cell
+let lastTouchEnd = 0;
 
 function initDomRefs(){
   boardWrapper = $("boardWrapper");
@@ -487,27 +491,24 @@ function initDomRefs(){
   playerTimeElm= $("playerTime");
   overlayText  = $("overlayText");
   showNewGame(false); showStyleIconIcon(false);
-  //soundElm.textContent = "🔈";
   //pieceCtx.imageSmoothingEnabled = false;
   animeCtx.imageSmoothingEnabled = false;
   handCtx.imageSmoothingEnabled = false;
 
+  // Block double-tap zoom in ios
+  document.addEventListener("touchend", e => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive:false });
+  document.addEventListener("touchstart", e => {
+    if (e.touches.length > 1) e.preventDefault();
+  }, { passive:false });
+  document.addEventListener("gesturestart", e => e.preventDefault());
 }
 
 function $(id){ return doc.getElementById(id); }
 
-/*
-function setBoardOffset() {
-  return;
-  const rect = boardWrapper.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  //OFFX = Math.round(rect.left * dpr);
-  //OFFY = Math.round(rect.top * dpr);
-  OFFX = Math.round((rect.left - extOffsetX) * dpr);
-  OFFY = Math.round((rect.top  - extOffsetY) * dpr);
-  //return { x: Math.round(rect.left * dpr), y: Math.round(rect.top * dpr) };
-}
-*/
 
 /* ===== Load All Images ===== */
 
@@ -635,8 +636,8 @@ function initCellOffsets() {
   if (level === 0) v = 0.08; // 8% for level 0
   if (gameCount < 2) v = 0; // no error in the first game
   for (let i = 0; i < 64; i++) {
-    cellErrX[i] = (Math.random() * 2 - 1) * v; 
-    cellErrY[i] = (Math.random() * 2 - 1) * v;
+    cellErrX[i] = randSym(v);
+    cellErrY[i] = randSym(v);
   }
   calcCellOffsets();
 }
@@ -644,8 +645,8 @@ function initCellOffsets() {
 function calcCellOffsets() {
   const c = SQPX;   // cell size in px
   for (let i = 0; i < 64; i++) {
-    cellX[i] = Math.round(((i & 7)  + cellErrX[i]) * c);
-    cellY[i] = Math.round(((i >> 3) + cellErrY[i]) * c);
+    cellX[i] = Math.round((PFILE(i) + cellErrX[i]) * c);
+    cellY[i] = Math.round((PRANK(i) + cellErrY[i]) * c);
   }
 }
 
@@ -675,7 +676,7 @@ function drawBoard() {
   boardCtx.font = (c * 0.15 | 0) + "px Arial"; boardCtx.fillStyle = "#A98";
   boardCtx.textAlign = "right"; boardCtx.textBaseline = "top"; 
   for (let i = 0; i < 64; i++) {
-    const x = i & 7, y = i >> 3, playable = (x + y) & 1;
+    const x = PFILE(i), y = PRANK(i), playable = (x + y) & 1;
     const img = images[boardStyle][playable ? EMPTY : NOUSE];
     boardCtx.drawImage(img, x * c, y * c, c, c);
     if (playable && cellNumEnabled && sqCssSize > 36) { // avoid too small sq
@@ -701,7 +702,7 @@ function drawPieces(hightlight = true) {
     const c = SQPX, i = selectedCell;
     const p = imgP(pc[i]); // piece color based on who start first
     const img = images[boardStyle][COLOR(p) === LGHT ? SEL_WHITE : SEL_BLACK];
-    animeCtx.drawImage(img, (i & 7) * c + OFFX, (i >> 3) * c + OFFY, c, c);
+    animeCtx.drawImage(img, PFILE(i) * c + OFFX, PRANK(i) * c + OFFY, c, c);
   }
 }
 
@@ -725,7 +726,7 @@ function drawPieceXY(img, x, y) {
 }
 
 function clearPiece(cell) {
-  const c = SQPX, x = (cell & 7) * c + OFFX, y = (cell >> 3) * c + OFFY, e = c * 0.2;
+  const c = SQPX, x = PFILE(cell) * c + OFFX, y = PRANK(cell) * c + OFFY, e = c * 0.2;
   pieceCtx.clearRect(x, y - e, c, c + e * 2); // clear top bottom too
   pieceCtx.clearRect(x - e, y, c + e * 2, c); // clear left right too
 }
@@ -747,11 +748,11 @@ function drawCapturedSlots(side = null) {
 }
 
 function clearCapSlot(side = null) {
-  const c = SQPX;
-  if (side === null || side === DARK)
-    pieceCtx.clearRect(OFFX - c * 3.5, OFFY - c * 1, c * 3, c * 4);
-  if (side === null || side === LGHT)
-    pieceCtx.clearRect(OFFX + c * 8.5, OFFY + c * 5, c * 3, c * 4);
+  const c = SQPX, w = c * 3, h = c * 3.5;
+  const x1 = OFFX + leftSlotBaseX  * c, y1 = OFFY + topSlotBaseY    * c; // DARK top-left
+  const x2 = OFFX + rightSlotBaseX * c, y2 = OFFY + bottomSlotBaseY * c; // LIGHT bottom-right
+  if (side === null || side === DARK) pieceCtx.clearRect(x1, y1, w, h);
+  if (side === null || side === LGHT) pieceCtx.clearRect(x2, y2, w, h);
   drawCapSlotBox(side);
 }
 
@@ -815,6 +816,7 @@ function showStyleIconIcon(show) {
 
 const PAUSE = 60, PIECE_MOVE_MS = 200;
 const HSLOW = 300, HFAST = 200, GIRL_SPEED = 1.2;
+let homeX, homeY;
 
 async function animateMove(mv, startX = null, startY = null) {
   const fmCell = FM(mv), toCell = TO(mv), mvBits = BITS(mv), mvPiece = pc[fmCell];
@@ -844,10 +846,10 @@ async function animateMove(mv, startX = null, startY = null) {
     if (isCapture) {
       const capCell = captureCellFromMove(mv);
       const capPiece = pc[capCell];
-      const capHX = PFILE(capCell) * c, capHY = RANK(capCell) * c;
+      const capHX = PFILE(capCell) * c, capHY = PRANK(capCell) * c;
       const capImg = images[boardStyle][imgP(capPiece) + PMOV_SHIFT];
       // 1) Remove a captured cell
-      await holdMs(HFAST); drawPiece(EMPTY, capCell);
+      await holdMs(); drawPiece(EMPTY, capCell);
       // 2) Allocate a free captured slot
       const slotIdx = getFreeCaptureSlot(LGHT);
       // 3) Send captured piece to a free captured slot
@@ -860,14 +862,17 @@ async function animateMove(mv, startX = null, startY = null) {
     return;
   }
 
+
   // ======== HAND ANIMATION ========
   const isMovePwn = !isCapture && !isPromote && mvPiece === D_PWN;
+  const isConfident = (level > 1 || curBestScore > 150) ? true : false;
+  const isShowOffDoubleCap = (level > 0 && chance(Math.min((curBestScore - 150) / 450, 0.5)));
   const prvFm = prvBestMove > 0 ? FM(prvBestMove) : -1;
   const prvTo = prvBestMove > 0 ? TO(prvBestMove) : -1;
   const isFar = fmCell >= 24;
 
   // 2.1 Hand Images and Move Speed
-  let handIdx, spd = 1, isConfident = false;
+  let handIdx, spd = 1;
 
   if (level === 0) {
     spd = GIRL_SPEED;
@@ -877,13 +882,13 @@ async function animateMove(mv, startX = null, startY = null) {
     if (isPromote) handIdx = HAND_CAP2;
     else if (mvPiece === D_HRS && boardStyle === STYLE_CLASSIC) handIdx = HAND_CAPW; // wide
     else if (isCapture) handIdx = isFar ? HAND_CAP2 : HAND_CAP1;
+    else if (isShowOffDoubleCap) handIdx = HAND_CAP2;
     else handIdx = isFar ? HAND_MOV1 : HAND_MOV2;
   }
-  if (level > 1 || curBestScore > 150) isConfident = true;
 
   // --- set intention-based flags ---
-  const isHesitantMovPwn = moveCount > 6 && isMovePwn && !isConfident;
-  const doSmallDragError = isHesitantMovPwn && chance(0.1);
+  const isHesitantMovPwn = isMovePwn && !isConfident && moveCount > 6;
+  const isConfidentMovPwn= isMovePwn && isConfident;
   const doTargetHesitate = isHesitantMovPwn && prvFm === fmCell && prvTo !== toCell;
   const doSecondBestLook = isHesitantMovPwn && prvFm !== fmCell;
 
@@ -896,20 +901,20 @@ async function animateMove(mv, startX = null, startY = null) {
   const pickX = fmX, pickY = fmY, dropX = toX, dropY = toY;
 
   await initHandCanvas(imgHand, handW, handH);
-  const homeX = (PFILE(toCell) / 2) * SQPX, homeY = -handH; // Off-screen top left
+  homeX = (PFILE(toCell) / 2) * c, homeY = -handH - c * 0.2; // Off-screen top left
   handX = homeX - handGripX; handY = homeY - handGripY; // hand start ourside board
   await handTo(20, homeX, homeY); // reset hand to home position
 
   // === PHASE 1: Hand moving to a piece ===
 
-  const pickErrX = Math.round((Math.random() * 0.1 - 0.05) * c);
+  const pickErrX = Math.round(randSym(0.05) * c);
   const pickErrY = Math.round(((mvPiece === D_HRS || isCapture) ? 0.1 : -0.1) * c);
   const prePickX = pickX + pickErrX, prePickY = pickY + pickErrY;
 
   // --- hand to second best piece ---
   //if (moveCount > 8 && isMovePwn && !isConfident && prvFm != fmCell) {
   if (doSecondBestLook) {
-    const fm2X = PFILE(prvFm) * c, fm2Y = RANK(prvFm) * c; // second best cell
+    const fm2X = PFILE(prvFm) * c, fm2Y = PRANK(prvFm) * c; // second best cell
     const fm1X = (fm2X + homeX) / 2, fm1Y = (fm2Y + homeY) / 2; // best cell
     await handTo(HSLOW * spd, fm2X, fm2Y); // hand to 2nd best piece
     await handUp(HSLOW, fm2X, fm2Y);
@@ -923,7 +928,6 @@ async function animateMove(mv, startX = null, startY = null) {
     // hand to pre-pick position
     await handTo(HSLOW * spd, prePickX, prePickY, fmCell < 16 ? -arc / 2 : 0);
     // hand hesitate
-    //if (isMovePwn && !isConfident && chance(0.1)) 
     if (isHesitantMovPwn && chance(0.1)) 
       await handUp(HSLOW, prePickX, prePickY); // hand float
     await holdMs(20); // tiny pause
@@ -936,50 +940,31 @@ async function animateMove(mv, startX = null, startY = null) {
 
   // === PHASE 2: Move hand with piece to target cell ===
 
-  // --- hesitate if the moving piece can move two ways ---
-  //if (moveCount > 8 && isMovePwn && !isConfident && prvFm === fmCell && prvTo !== toCell) {
+  // --- hesitate if 2 ways to move ---
   if (doTargetHesitate) {
-    //const prvTo = TO(prvBestMove);
-    const prvToX = PFILE(prvTo) * c, prvToY = RANK(prvTo) * c;
-    const t = 0.25 + Math.random() * 0.5;
-    const midX = fmX + (prvToX - fmX) * t, midY = fmY + (prvToY - fmY) * t;
-    // 1) drag to previous best target
-    await handTo(HSLOW * spd, midX, midY, 0, pmoveImg,null,null, null,SOUND_MOV);
-    await holdMs(HSLOW);
-    // 2) drag back to original square (change of mind)
-    await handTo(HSLOW, fmX + 0.1 * c, fmY + 0.1 * c, 0, pmoveImg,null,null, null,SOUND_MOV);
-    await holdMs(HSLOW);
+    const prvToX = PFILE(prvTo) * c, prvToY = PRANK(prvTo) * c;
+    await handTargetHesitate(prvToX, prvToY, fmX, fmY, pmoveImg);
   }
 
-  // drag piece with small error
-  //if (isMovePwn && !isConfident && chance(0.1)) { // drags piece with small error
-  if (isHesitantMovPwn && chance(0.1)) {
-    const errX = Math.round((Math.random() * 2 - 1) * 0.2 * c);
-    const errY = Math.round((Math.random() * 2 - 1) * 0.3 * c);
-    const pErrX = toX + errX, pErrY = toY + errY;
-    const hErrX = dropX + errX, hErrY = dropY + errY;
-    const hAwayX = (homeX + dropX) / 2, hAwayY = (homeY + dropY) / 2;
-    // 1) Hand drags piece to target cell with small error
-    await handTo(HSLOW * spd, hErrX, hErrY, 0, pmoveImg,null,null, null,SOUND_MOV);
+  if (isCapture) {
+    await handDropPiece(HSLOW * spd, dropX, dropY, arc, pmoveImg, SOUND_CAP);
+  }
+  else if (isShowOffDoubleCap) {
+    await handDragAndCap(dropX, dropY, pmoveImg);
+  }
+  else if (isHesitantMovPwn && chance(0.1)) {
+    await handDragError(dropX, dropY, pmoveImg, toX, toY);
+  }
+  else if (isConfidentMovPwn && chance(0.3)) {
+    await handOvershootDrag(dropX, dropY, pmoveImg);
+  }
+  else if (isConfidentMovPwn && chance(0.5)) {
+    await handDragAndTap(dropX, dropY, pmoveImg);
+  }
+  else {
+    await handDragPiece(HSLOW * spd, dropX, dropY, pmoveImg);
     await holdMs();
-    // 2) Hand moves away half way
-    await handTo(HFAST, hAwayX, hAwayY, 0, pmoveImg, pErrX, pErrY);
-    // 3) Hand comes back
-    await handTo(HFAST, hErrX, hErrY, 0, pmoveImg, pErrX, pErrY);
-    // 4) Hand drags piece to correct position
-    await handTo(HFAST, dropX, dropY, 0, pmoveImg,null,null, null,SOUND_FIX);
-    await holdMs();
-  } else {
-    // piece to target cell
-    if (isCapture) {
-      // Drop piece at target cell
-      await handTo(HSLOW * spd, dropX, dropY, arc, pmoveImg,null,null, null,null,SOUND_CAP);
-    } else {
-      // Drag piece to target cell
-      await handTo(HSLOW * spd, dropX, dropY, 0, pmoveImg,null,null, null,SOUND_MOV);
-    }
-    await holdMs();
-  }  
+  }
 
   // draw target piece
   drawPiece(mvPiece, toCell);
@@ -989,19 +974,10 @@ async function animateMove(mv, startX = null, startY = null) {
     const hitCell = toCell - 16; // the piece we hit by mistake at 2 rows below
     const hitPc = pc[hitCell];
     if (hitPc === L_PWN || hitPc === D_PWN) {
-      // Correct position of the hit piece
-      //const hitX = PFILE(hitCell) * c, hitY = RANK(hitCell) * c;
       const hitX = cellX[hitCell], hitY = cellY[hitCell];
-      // Accidental dragged position
-      const slipX = hitX + Math.round((Math.random() * 2 - 1) * 0.3 * c);
-      const slipY = hitY - Math.round(Math.random() * 0.3 * c);
       const hitImg = images[boardStyle][imgP(hitPc) + PMOV_SHIFT];
       drawPiece(EMPTY, hitCell); // temp remove the hit piece
-      await handTo(PAUSE, (slipX+homeX)/2, (slipY+homeY)/2, 0, hitImg, slipX, slipY); // away
-      await holdMs();
-      await handTo(HFAST, slipX, slipY, arc, hitImg, slipX, slipY); // hand back, piece stays
-      await holdMs();
-      await handTo(HFAST, hitX, hitY, 0, hitImg,null,null, null,SOUND_FIX); // drag to correct
+      await handHitPiece(hitX, hitY, hitImg);
       drawPiece(hitPc, hitCell); // restore the hit piece
     }
   }
@@ -1010,7 +986,7 @@ async function animateMove(mv, startX = null, startY = null) {
   if (isCapture) {
     const capCell = captureCellFromMove(mv);
     const capPiece = pc[capCell];
-    const capHX = PFILE(capCell) * c, capHY = RANK(capCell) * c;
+    const capHX = PFILE(capCell) * c, capHY = PRANK(capCell) * c;
     const capImg = images[boardStyle][imgP(capPiece) + PMOV_SHIFT];
     // 1) move hand to captured cell
     await handTo(HFAST * spd, capHX, capHY, arc);
@@ -1022,9 +998,9 @@ async function animateMove(mv, startX = null, startY = null) {
     // 3) Carry captured piece to a free captured slot
     if (slotIdx != null && slotIdx.idx != null) {
       const { idx, x: slotX, y: slotY } = slotIdx; // get slot offset XY
-      await handTo(HSLOW * spd, slotX, slotY, arc / 3, capImg);
+      //await handTo(HSLOW * spd, slotX, slotY, arc / 3, capImg);
+      await handDropPiece(HFAST, slotX, slotY, arc / 3, capImg);
       storeCapturedPiece(DARK, idx, imgP(capPiece));
-      //console.log(slotX, slotY, OFFX, OFFY);
       drawCapturedSlots();
       await holdMs();
     }
@@ -1039,7 +1015,8 @@ async function animateMove(mv, startX = null, startY = null) {
   if (isPromote) {
     // 1) hand returns with new piece
     const promoImg = images[boardStyle][imgP(D_PWN)];
-    await handTo(HFAST * spd, dropX, dropY, 0, promoImg,null,null, null,null,SOUND_HIT);
+    //await handTo(HFAST * spd, dropX, dropY, 0, promoImg,null,null, null,null,SOUND_HIT);
+    await handDropPiece(HFAST * spd, dropX, dropY, 0, promoImg, SOUND_HIT);
     await holdMs();
     // 2) draw promoted piece
     drawPiece(D_HRS, toCell);
@@ -1047,6 +1024,76 @@ async function animateMove(mv, startX = null, startY = null) {
     await handTo(HFAST * spd, homeX, homeY);
   }
 }
+
+//=================================================
+//              MOVE BEHAVIOR HELPERS
+//=================================================
+
+async function handPickPiece(ms, x, y, arc=0, pieceImg, sound=SOUND_PCK) {
+  await handTo(ms, x, y, arc, pieceImg, null,null, sound);
+}
+async function handDragPiece(ms, x, y, pieceImg, sound=SOUND_MOV) {
+  await handTo(ms, x, y, 0, pieceImg, null,null, null,sound);
+}
+async function handDropPiece(ms, x, y, arc=0, pieceImg, sound=null) {
+  await handTo(ms, x, y, arc, pieceImg, null,null, null,null,sound);
+}
+async function handToPcStay(ms, x, y, arc=0, pieceImg, px, py) {
+  await handTo(ms, x, y, arc, pieceImg, px, py);
+}
+
+async function handTargetHesitate(prvToX, prvToY, fmX, fmY, pieceImg) {
+  const t = vary(0.5);
+  const midX = fmX + (prvToX - fmX) * t, midY = fmY + (prvToY - fmY) * t;
+  await handDragPiece(HSLOW, midX, midY, pieceImg);
+  await holdMs();
+  await handDragPiece(HSLOW, fmX + SQPX*0.1, fmY + SQPX*0.1, pieceImg);
+  await holdMs();
+}
+async function handDragAndTap(dropX, dropY, pmoveImg) {
+  const arc = HAND_CURVE * SQPX;
+  await handDragPiece(HFAST, dropX, dropY, pmoveImg);
+  if (chance(0.5))
+    await handTo(PAUSE, dropX, dropY - SQPX*0.1, arc/2, pmoveImg, dropX, dropY);
+  await handTo(PAUSE, dropX, dropY, arc/3, pmoveImg, dropX, dropY);
+  await holdMs();
+}
+async function handDragAndCap(dropX, dropY, pmoveImg) {
+  const arc = HAND_CURVE * SQPX, r = pick(0.5,1,1.5);
+  await handDragPiece(HSLOW, dropX, dropY - SQPX*0.2, pmoveImg);
+  await handDropPiece(HFAST * r, dropX, dropY, arc * r, pmoveImg, SOUND_CAP);
+  await holdMs();
+}      
+async function handOvershootDrag(x, y, pieceImg) {
+  await handTo(HFAST, x, y + SQPX*0.1, 0, pieceImg,null,null, null,SOUND_MOV);
+  await handTo(PAUSE, x, y, 0, pieceImg,null,null, null,SOUND_FIX);
+  await holdMs();
+}
+async function handDragError(dropX, dropY, pieceImg, toX, toY) {
+  const errX = Math.round(randSym(0.2 * SQPX));
+  const errY = Math.round(randSym(0.3 * SQPX));
+  const pErrX = toX + errX,        pErrY = toY + errY;
+  const hErrX = dropX + errX,      hErrY = dropY + errY;
+  const awayX = (homeX + dropX)/2, awayY = (homeY + dropY)/2;
+  await handDragPiece(HSLOW, hErrX, hErrY, pieceImg);
+  await handTo(HFAST, awayX, awayY, 0, pieceImg, pErrX, pErrY);
+  await handTo(HFAST, hErrX, hErrY, 0, pieceImg, pErrX, pErrY);
+  await handDragPiece(HFAST, dropX, dropY, pieceImg, SOUND_FIX);
+  await holdMs();
+}
+async function handHitPiece(hitX, hitY, hitImg) {
+  const arc = HAND_CURVE * SQPX;
+  const slipX = hitX + Math.round(randSym(0.3 * SQPX));
+  const slipY = hitY - Math.round(Math.random() * 0.3 * SQPX);
+  await handTo(PAUSE, (slipX+homeX)/2, (slipY+homeY)/2, 0, hitImg, slipX, slipY); // away
+  await holdMs();
+  await handTo(HFAST, slipX, slipY, arc, hitImg, slipX, slipY); // hand back, piece stays
+  await holdMs();
+  await handDragPiece(HFAST, hitX, hitY, hitImg, SOUND_FIX); // drag to correct
+  await holdMs();
+}
+
+
 
 async function animateGivePiece() {
   if (boardStyle === STYLE_MODERN) return;
@@ -1056,10 +1103,6 @@ async function animateGivePiece() {
   const imgHand = images[IMG_HAND][GIRL_CAP1];
   setHandScale(imgHand);
   await initHandCanvas(imgHand, handW, handH);
-
-  //const homeX = Math.round((8 * c) / 2 - handW);
-  //const homeY = Math.round(-handH);
-  //handX = homeX; handY = homeY; // start hand at home
   const homeX = SQPX * 3, homeY = -SQPX * 2; // Off-screen top left
   handX = homeX - handGripX; handY = homeY - handGripY; // hand start ourside board
   await handTo(20, homeX, homeY); // move hand to home position
@@ -1070,8 +1113,8 @@ async function animateGivePiece() {
     if (piece === EMPTY) return;
     let cell0; // first attempt cell but not equal to actual cell
     do { cell0 = pick(8, 10, 12); } while (cell0 === cell);
-    const pck0X = PFILE(cell0) * c, pck0Y = RANK(cell0) * c;
-    const pickX = PFILE(cell) * c, pickY = RANK(cell) * c;
+    const pck0X = PFILE(cell0) * c, pck0Y = PRANK(cell0) * c;
+    const pickX = PFILE(cell) * c, pickY = PRANK(cell) * c;
     //const giveX = (8 * c) / 2, giveY = (8 * c);
     const giveX = homeX, giveY = homeY;
     const r = Math.random();
@@ -1086,16 +1129,14 @@ async function animateGivePiece() {
     await handTo(HFAST, pickX, pickY, arc); // hand to cell
     await holdMs();
     drawPiece(EMPTY, cell); // remove piece
-    await handTo(HSLOW * 2, giveX, giveY, 0, img,null,null, SOUND_PCK); // carry
-    await holdMs();
-    await handTo(HSLOW * GIRL_SPEED, homeX, homeY); // hand back to home
+    await handPickPiece(HSLOW, homeX, homeY, -arc, img); // pick and carry
     pc[cell] = EMPTY;
   } else {
     // 40% Promote a light pawn
     const cell = pick(58, 60, 62), piece = pc[cell], img = images[boardStyle][imgP(piece)];
     if (piece === EMPTY) return;
-    const pickX = PFILE(cell) * c, pickY = RANK(cell) * c;
-    await handTo(HSLOW, pickX, pickY, arc, img,null,null, null,null,SOUND_HIT); // hand to cell
+    const pickX = PFILE(cell) * c, pickY = PRANK(cell) * c;
+    await handDropPiece(HSLOW, pickX, pickY, arc, img, SOUND_HIT); // hand to cell
     drawPiece(L_HRS, cell); // promote piece
     await holdMs();
     await handTo(HSLOW * GIRL_SPEED, homeX, homeY); // hand back to home
@@ -1114,7 +1155,7 @@ async function animatePieceMove(ms, sX, sY, tX, tY, img) {
 async function animateSelect(cell) {
   const p = pc[cell], c = SQPX;
   const x = PFILE(cell) * c;
-  const y = RANK(cell) * c;
+  const y = PRANK(cell) * c;
   clearAnimeCanvas();
   if(COLOR(p)===LGHT) animeCtx.drawImage(images[boardStyle][SEL_WHITE], x, y, c, c);
   if(COLOR(p)===DARK) animeCtx.drawImage(images[boardStyle][SEL_BLACK], x, y, c, c);
@@ -1141,20 +1182,22 @@ function captureCellFromMove(mv) {
  
  *********************************************************/
 
+const DROP_PATTERNS = [ [1,3,5,7,14,12,10,8], [7,14,5,12,3,10,1,8], [14,12,10,8,1,3,5,7] ];
+
 async function animateInitBoard() {
   if (boardStyle === STYLE_MODERN) return;
   const c = SQPX, arc = HAND_CURVE * c;
   // piece image
-  const imgD = images[boardStyle][imgP(D_HRS)];
-  const imgL = images[boardStyle][imgP(L_HRS)];
+  const imgD = images[boardStyle][imgP(D_PWN)];
+  const imgL = images[boardStyle][imgP(L_PWN)];
   // hand init
   const imgHand = images[IMG_HAND][level === 0 ? GIRL_CAP1 : HAND_CAP2];
+  const dropOrder = DROP_PATTERNS[pick(0,1,2)];
   setHandScale(imgHand);
   await initHandCanvas(imgHand, handW, handH);
   const homeX = SQPX * 3, homeY = -SQPX * 2; // Off-screen top left
   handX = homeX - handGripX; handY = homeY - handGripY; // hand start ourside board
   await handTo(20, homeX, homeY); // move hand to home position
-  //drawPieces();
 
   // collect all pieces in board
   const pcD = [], pcL = [], slD = [], slL = [];
@@ -1163,8 +1206,6 @@ async function animateInitBoard() {
     if (p === D_PWN || p === D_HRS) pcL.push(i);
     if (p === L_PWN || p === L_HRS) pcD.push(i);
   }
-  //console.log(pcD,pcL);
-  //await holdMs(10*HSLOW);
 
   // collect all pieces in slots
   for (let i = CAP_SLOTS; i >= 0; i--) {
@@ -1172,24 +1213,27 @@ async function animateInitBoard() {
     if (capSlotLP[i] !== EMPTY) slL.push(i);
   }
 
-
+  // animate dark and light side parallelly
   await Promise.all([
 
     // ---- DARK ----
     (async () => {
       // move hand to pick each dark pieces in board
       for (let i of pcD) {
-        const sX = PFILE(i) * c, sY = RANK(i) * c;
-        await handTo(HFAST, sX, sY, arc / 3, imgD, null,null, SOUND_PCK);
+        const sX = PFILE(i) * c, sY = PRANK(i) * c;
+        await handPickPiece(HFAST, sX, sY, arc / 3, imgD);
+        //await handTo(HFAST, sX, sY, arc / 3, imgD, null,null, SOUND_PCK);
         await holdMs();
         drawPiece(EMPTY, i);
       }
       // drop picked dark pieces to init positions
       let dropIdxD = 0;
       for (let i = 0; i < pcD.length; i++) {
-        const toSq = pcConv[i];
-        const tX = PFILE(toSq) * c, tY = RANK(toSq)  * c;
-        await handTo(HFAST, tX, tY, arc / 3, imgD, null,null,null,null, SOUND_HIT);
+        //const toSq = pcConv[i];
+        const toSq = dropOrder[i];
+        const tX = PFILE(toSq) * c, tY = PRANK(toSq)  * c;
+        await handDropPiece(HFAST, tX, tY, arc / 3, imgD, SOUND_HIT);
+        //await handTo(HFAST, tX, tY, arc / 3, imgD, null,null,null,null, SOUND_HIT);
         await holdMs();
         drawPiece(D_PWN, toSq);
       }
@@ -1205,9 +1249,11 @@ async function animateInitBoard() {
       }
       // drop picked dark pieces to init positions
       for (let i = pcD.length; i < 8; i++) {
-        const toSq = pcConv[i];
-        const tX = PFILE(toSq) * c, tY = RANK(toSq) * c;
-        await handTo(HFAST, tX, tY, arc / 3, imgD, null,null,null,null, SOUND_HIT);
+        //const toSq = pcConv[i];
+        const toSq = dropOrder[i];
+        const tX = PFILE(toSq) * c, tY = PRANK(toSq) * c;
+        await handDropPiece(HFAST, tX, tY, arc / 3, imgD, SOUND_HIT)
+        //await handTo(HFAST, tX, tY, arc / 3, imgD, null,null,null,null, SOUND_HIT);
         await holdMs();
         drawPiece(D_PWN, toSq);
       }
@@ -1251,8 +1297,9 @@ async function animateInitBoard() {
 
 
 
-
-// ============ CAPTURED PIECE SLOTS ===============
+//=================================================
+//              CAPTURED PIECE SLOTS
+//=================================================
 
 const CAP_SLOTS = 8;
 let capSlotLX = new Array(CAP_SLOTS), capSlotLY = new Array(CAP_SLOTS);
@@ -1260,47 +1307,26 @@ let capSlotDX = new Array(CAP_SLOTS), capSlotDY = new Array(CAP_SLOTS);
 let capSlotLP = new Array(CAP_SLOTS).fill(EMPTY); // AI captured (light pieces)
 let capSlotDP = new Array(CAP_SLOTS).fill(EMPTY); // Player captured (dark pieces)
 
+const leftSlotBaseX  = -3.5, topSlotBaseY    = -0.5; // DARK top-left outside
+const rightSlotBaseX =  8.5, bottomSlotBaseY =  4.5; // LIGHT bottom-right outside
+
+
 function initCaptureSlots() {
-  // DARK top-left outside
-  const leftBaseX = -3.5;   // cells
-  const topBaseY  = -0.5;
-  // LIGHT bottom-right outside
-  const rightBaseX  = 8.5;
-  const bottomBaseY = 5.0;
+
   const cols = 3, err = 0.3, colW = 0.7;
   let col, row;
   for (let i = 0; i < CAP_SLOTS; i++) {
     // --- DARK slots ---
-    capSlotDX[i] = (leftBaseX + (i%cols)*colW + vary(err));
-    capSlotDY[i] = (topBaseY  + (i%cols)/cols + Math.floor(i/cols)*colW + vary(err));
+    capSlotDX[i] = (leftSlotBaseX + (i%cols)*colW + vary(err));
+    capSlotDY[i] = (topSlotBaseY  + (i%cols)/cols + Math.floor(i/cols)*colW + vary(err));
     capSlotDP[i] = EMPTY;
     // --- LIGHT slots ---
     col = (cols-1) - (i%cols); // reverse order
     row = (cols-1) - Math.floor(i/cols);
-    capSlotLX[i] = (rightBaseX  + col*colW + vary(err));
-    capSlotLY[i] = (bottomBaseY + col/cols + row*colW + vary(err));
+    capSlotLX[i] = (rightSlotBaseX  + col*colW + vary(err));
+    capSlotLY[i] = (bottomSlotBaseY + col/cols + row*colW + vary(err));
     capSlotLP[i] = EMPTY;
   }
-  //debug
-  /* ====== 64 ======
-     1   3   5   7
-   8  10  12  14
-    17  19  21  23
-  24  26  28  30
-    33  35  37  39
-  40  42  44  46
-    49  51  53  55
-  56  58  60  62
-  ================ */
-  /*
-  pc[ 1]=pc[12]=pc[35]=pc[55]=L_PWN;
-  pc[24]=pc[46]=pc[62]=D_PWN;
-  //initCaptureSlots();
-  capSlotLP[0]=capSlotLP[2]=capSlotLP[6]=L_PWN;
-  capSlotDP[0]=capSlotDP[4]=capSlotDP[6]=capSlotDP[7]=D_PWN;
-  drawCapturedSlots();
-  */
-  //console.log("DARK:", capSlotDX, capSlotDY, "LIGHT:", capSlotLX, capSlotLY);
 }
 
 function getFreeCaptureSlot(side){
@@ -1313,19 +1339,6 @@ function getFreeCaptureSlot(side){
   const idx = f[Math.random()*f.length|0];
   return { idx, x: sx[idx]*SQPX, y: sy[idx]*SQPX };
 }
-
-/*
-function getFreeCaptureSlot(side) {
-  const s = (side === LGHT) ? capSlotLP : capSlotDP, f=[];
-  for (let i=0;i<CAP_SLOTS;i++) if (s[i]===EMPTY) f.push(i);
-  if (!f.length) return -1;
-  return f[Math.random()*f.length|0]; // return slot idx
-}
-function getCaptureSlotXY(side, idx) {
-  if (side === LGHT) return { x: capSlotLX[idx] * SQPX, y: capSlotLY[idx] * SQPX };
-  else               return { x: capSlotDX[idx] * SQPX, y: capSlotDY[idx] * SQPX };
-}
-*/
 
 function storeCapturedPiece(side, idx, piece) {
   //console.log("storeCapturedPiece",side,idx,piece);
@@ -1410,8 +1423,8 @@ async function handTo(ms, hx, hy, arc = 0, img = null, qx = null, qy = null,
 async function handUp(ms, x, y, amp = SQPX / 50) {
   const t0 = performance.now();
   while (performance.now() - t0 < ms) {
-    const rx = (Math.random() * 2 - 1) * amp;
-    const ry = (Math.random() * 2 - 1) * amp;
+    const rx = randSym(amp);
+    const ry = randSym(amp);
     await handTo(ms / 2, x + rx, y + ry);
   }
   await handTo(PAUSE, x, y); // settle back
@@ -1584,16 +1597,14 @@ async function toggleSound() {
   soundElm.src = speakerImgs[soundLevel];
 }
 
-function vary(base, amount = 0.25) { return base * (1 + (Math.random() * 2 - 1) * amount); }
-
 
 /******************** MOUSE ************************
  
-     ##    ##   #####   ##   ##   #####   #####
-     ###  ###  ##   ##  ##   ##  ##       ##     
-     ## ## ##  ##   ##  ##   ##   #####   ####  
-     ##    ##  ##   ##  ##   ##       ##  ##     
-     ##    ##   #####    #####    #####   #####
+     ###    ###   #####   ##   ##   #####   #####
+     ####  ####  ##   ##  ##   ##  ##       ##     
+     ## #### ##  ##   ##  ##   ##   #####   ####  
+     ##  ##  ##  ##   ##  ##   ##       ##  ##     
+     ##      ##   #####    #####    #####   #####
 
  *************************************************/
 
@@ -1759,7 +1770,7 @@ function getCellFromClientPos(clientX, clientY) {
   const scaleX = boardCanvas.width / rect.width;
   const scaleY = boardCanvas.height / rect.height;
   const x = Math.floor((clientX - rect.left) * scaleX / SQPX);
-  const y = Math.floor((clientY - rect.top) * scaleY / SQPX); // shift y for 1 cell
+  const y = Math.floor((clientY - rect.top)  * scaleY / SQPX);
   if (x < 0 || x > 7 || y < 0 || y > 7) return -1;
   return y * 8 + x;
 }
@@ -1772,18 +1783,11 @@ function updateDragPos(e){
 }
 
 function drawDrag(){
-
-  //setBoardOffset();
-  //console.log(off.x, off.y);
-
+  if(dirty) clearDirty();
   /* board → page */
   const x = Math.round(dragX - SQPX/2) + OFFX;
   const y = Math.round(dragY - SQPX/2) + OFFY;
-
-  if(dirty) clearDirty();
-
   const img = images[boardStyle][imgP(dragPc) + PMOV_SHIFT];
-
   drawMovingPiece(img, x, y);
   dragPrevX = x;
   dragPrevY = y;
@@ -1791,10 +1795,8 @@ function drawDrag(){
   /* ===== ghost target ===== */
   const t = nearestCachedTarget(dragX, dragY);
   if(t >= 0){
-
-    const tx = (t & 7) * SQPX + OFFX;
-    const ty = (t >> 3) * SQPX + OFFY;
-
+    const tx = PFILE(t) * SQPX + OFFX;
+    const ty = PRANK(t) * SQPX + OFFY;
     animeCtx.globalAlpha = 0.1;
     drawMovingPiece(img, tx, ty);
     animeCtx.globalAlpha = 1;
@@ -1819,7 +1821,7 @@ function initDrag(cell, e) {
   //pmovCanvas.width = SQPX; pmovCanvas.height = SQPX;
   //pmovCtx.drawImage(images[boardStyle][dragPc], 0, 0, SQPX, SQPX);
   //initPmovCanvas(pc[cell]);
-  dragPrevX=(cell&7)*SQPX; dragPrevY=(cell>>3)*SQPX;
+  dragPrevX=PFILE(cell)*SQPX; dragPrevY=PRANK(cell)*SQPX;
   boardCanvas.setPointerCapture(e.pointerId);
   clearAnimeCanvas();
   //if (boardStyle !== STYLE_MODERN) 
@@ -1834,7 +1836,7 @@ function nearestCachedTarget(px,py){
   if(forceMove>=0) return forceMove;
   let best=-1, bestD=(1.1*SQPX)*(1.1*SQPX);
   for(const c of moveTargets){
-    const cx=(c&7)*SQPX+SQPX/2, cy=(c>>3)*SQPX+SQPX/2;
+    const cx=PFILE(c)*SQPX+SQPX/2, cy=PRANK(c)*SQPX+SQPX/2;
     const dx=px-cx, dy=py-cy, d=dx*dx+dy*dy;
     if(d<bestD){ best=c; bestD=d; }
     //console.log(c,d,best,bestD);
@@ -1870,7 +1872,7 @@ function RTO(x){ return x << 8; }
 function BITS(x){ return x & 0x00ff0000; }
 function COLOR(x){ return x & 5; }
 function PFILE(x){ return x & 7; }
-function RANK(x){ return x >> 3; } // devide by 8
+function PRANK(x){ return x >> 3; } // devide by 8
 function CAPBITS(x){ return ((x & X_HRS) ? MCAP_HRS : MCAP_PWN); }
 function CAPPIECE(x){ return ((x & 0x00010000) ? X_HRS : X_PWN); }
 
@@ -1981,8 +1983,8 @@ function myeval(){
     for (let i = 0; i < 32; i++) {
       const q = pcConv[i], p = pc[q];
       if (p === EMPTY) continue;
-      if (p === L_PWN) score_pc += RANK(q) + 5;         // light pawn score
-      else if (p === D_PWN) score_pc += RANK(63-q) + 5; // dark pawn mirrored score
+      if (p === L_PWN) score_pc += PRANK(q) + 5;         // light pawn score
+      else if (p === D_PWN) score_pc += PRANK(63-q) + 5; // dark pawn mirrored score
     }
     score_pc += (4 - L_PWN_cnt - D_PWN_cnt) * 6;
     if ((L_PWN_cnt | D_PWN_cnt) === 0) score_pc += 10;
@@ -2376,14 +2378,22 @@ async function aiMainLoop(){
       bestmv = forceOpeningMove();
       if(bestmv!==0) { msg+="..."; await holdMs(500); }
     }
-    if(USE_BK && moveCount > 6 && bestmv===0 && chance(0.8)) { // 80% to use opening book
+    if(USE_BK && moveCount > 3 && bestmv===0 && chance(0.85)) { // 85% to use opening book
       const bk_mv = bkProbe();
-      if(bk_mv) { bestmv=bk_mv; msg+=".."; await holdMs(500); }
+      if(bk_mv){
+        const f=FM(bk_mv), t=TO(bk_mv);
+        for(let i=0; i<gen_end[0]; i++){
+          const m = gen_dat[i];
+          if(FM(m) === f && TO(m) === t){
+            bestmv = m; msg+=".."; await holdMs(20); //console.log("BK_legal:",f,t);
+            break;
+          }
+        }
+      }
     }
     if(bestmv===0){ 
       if(await think()===false){ gameOver(1); break; }
       bestmv=pv[0][0];
-      //bestmv=bestMoveSoFar; 
     }
     if(!(gen_dat[0] & MSKIP)) { 
       bCompBusy = true; drawPieces(); 
@@ -2513,8 +2523,7 @@ function updateTimeDisplay() {
 }
 
 function startPlayerTimer() {
-  compTimeElm.style.color = "#aaa";
-  playerTimeElm.style.color = "#eee";
+  setTurnUI(true);
   updateTimeDisplay();
   if (playerInterval) clearInterval(playerInterval);
   playerInterval = setInterval(() => {
@@ -2524,8 +2533,7 @@ function startPlayerTimer() {
 }
 
 function stopPlayerTimer() {
-  compTimeElm.style.color = "#eee";
-  playerTimeElm.style.color = "#aaa";
+  setTurnUI(false);
   if (playerInterval) clearInterval(playerInterval);
   playerInterval = null;
   updateTimeDisplay();
@@ -2533,13 +2541,19 @@ function stopPlayerTimer() {
 
 function resetClock() {
   playerSeconds = compSeconds = 180;
-  compTimeElm.style.color = "#aaa";
-  playerTimeElm.style.color = "#eee";
+  setTurnUI(side === LGHT);
 }
 
 function hideTimers() {
-  compTimeElm.textContent = " ";
-  playerTimeElm.textContent = " ";
+  compTimeElm.textContent = " ";
+  playerTimeElm.textContent = " ";
+}
+
+function setTurnUI(isPlayerTurn) {
+  playerTimeElm.style.color  = isPlayerTurn ? "#eee" : "#888";
+  compTimeElm.style.color    = isPlayerTurn ? "#888" : "#eee";
+  styleElm.style.opacity     = isPlayerTurn ? 1      : 0.4;
+  styleCompElm.style.opacity = isPlayerTurn ? 0.4    : 1;
 }
 
 
@@ -3082,7 +3096,7 @@ function initZobrist32(seedInit = 123456) {
 const bk_map = new Map();     // key → bestmove
 let bkdbLoaded = 0;
 
-// ---------------- LOAD BOOK ----------------------
+// ---------------- LOAD STANDARD BOOK ----------------------
 async function loadBKDB(zipUrl = "DB0508.zip", innerFile = "DB0508.txt") {
   try {
     bk_map.clear(); bkdbLoaded = 0;
@@ -3105,15 +3119,85 @@ async function loadBKDB(zipUrl = "DB0508.zip", innerFile = "DB0508.txt") {
       bkdbLoaded++;
     }
     //console.log("BOOK LOADED", bkdbLoaded);
+    await loadNewBk();
   } catch (err) {
     //console.error("BOOK LOAD FAILED:", err);
   }
 }
 
+// -------- LOAD EXTRA NEW BOOK (TEXT MOVES) --------
+async function loadNewBk(url="newBK.txt"){
+  const res = await fetch(url);
+  const txt = await res.text();
+  const lines = txt.split("\n")
+    .map(l=>l.trim())
+    .filter(l=>l.length>0 && !/^\s*#/.test(l));
+  for(const line of lines) importNewBkLine(line);
+}
+
+function importNewBkLine(moveStr){
+  // init board
+  side=LGHT; pc.set(pc_init);
+  // --- normalize multi-capture ---
+  moveStr = moveStr.replace(/\b(\d+(?:x\d+)+)\b/g, m=>{
+    const p = m.split("x");
+    return p.map((v,i)=> i?`${p[i-1]}x${v}`:null)
+            .filter(Boolean).join(" . "); // skip turn
+  });
+  //console.log(moveStr);
+  const moves = moveStr.split(/\s+/);
+  for(const mv of moves){
+    //console.log(side,mv);
+    const key = boardEncode(); // encode BEFORE move
+    const packed = packBkMove(mv);
+    if(!bk_map.has(key)) bk_map.set(key,[]);
+    bk_map.get(key).push(packed);
+    bkdbLoaded++;
+    applyBkMove(mv);
+  }
+}
+
+function packBkMove(mv){
+  const cap = mv.includes("x");
+  let [f,t] = mv.split(cap ? "x" : "-").map(n=>+n);
+  if(side!==LGHT){f=33-f;t=33-t;}
+  return pcConv[f-1] | (pcConv[t-1]<<8);
+}
+
+function applyBkMove(mv){
+  if(mv==="."){ side^=1; return; } // skip turn
+  let [f,t] = mv.split(mv.includes("x")?"x":"-").map(n=>+n);
+  mv.includes("x") ? doBkCapture(f,t) : doBkMove(f,t);
+  side ^= 1;
+}
+
+function doBkMove(f,t){
+  const fm=pcConv[f-1], to=pcConv[t-1], p=pc[fm];
+  if(p===EMPTY) return;
+  pc[to]=p; pc[fm]=EMPTY;
+  if(p===L_PWN && to<8)   pc[to]=L_HRS;
+  if(p===D_PWN && to>=56) pc[to]=D_HRS;
+}
+
+function doBkCapture(f,t){
+  const fm=pcConv[f-1], to=pcConv[t-1];
+  doBkMove(f,t);
+  const c = fm>to ? (PFILE(fm)>PFILE(to)?to+9:to+7) : (PFILE(fm)>PFILE(to)?to-7:to-9);
+  if(pc[c]!==EMPTY) pc[c]=EMPTY;
+}
+
+
+//==================================================
+
+
 function bkProbe() {
   const key = boardEncode();
   const list = bk_map.get(key);
   if (!list) return null;
+      /*console.log("BK:", list.map(m=>{
+        const mv = BITS(m) | RTO(63-TO(m)) | (63-FM(m));
+        return `${cellToNum[FM(mv)]}-${cellToNum[TO(mv)]}`;
+      }).join(" , "));*/
   let mov = list[Math.floor(Math.random() * list.length)];
   mov = BITS(mov) | RTO(63-TO(mov)) | (63-FM(mov));
   //console.log("BK", key.toString(16), list.length, BITS(mov).toString(16), TO(mov), FM(mov));
@@ -3122,14 +3206,6 @@ function bkProbe() {
 
 // Encode the current board, tuned for speed
 function boardEncode() { 
-  /*
-  const enc = [4n, 5n, 6n, 7n];
-  let l = 0n;
-  for (let i = 0; i < 32; i++) { 
-    const p = pc[pcConv[i]]; 
-    l = (l * (p >= EMPTY ? 2n : 8n)) | (p >= EMPTY ? 0n : enc[p]); 
-  }
-  /*/
   const isLght = (side === LGHT); 
   const enc = (isLght ? [4n, 5n, 6n, 7n] : [5n, 4n, 7n, 6n]); 
   let l = 0n; 
