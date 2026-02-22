@@ -38,7 +38,7 @@ Zobrist key is 64 bits to avoid key duplication.
 "use strict";
 
 const CODE_VERSION = "x4sl";
-const CODE_DATE = "SL0220";
+const CODE_DATE = "SL0221";
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
@@ -144,7 +144,7 @@ const pcsq_init = new Int32Array([
    4,  0,  5,  0,  5,  0, (5), 0,   // 30
    0, (2), 0,  9,  0,  7,  0, (6),  // 33,39
   (1), 0,  6,  0,  6,  0,  6,  0,   // 40
-   0,  3,  0,  4,  0,  4,  0,  3,
+   0,  3,  0,  3,  0, (6), 0, (4),
    0,  0,  9,  0,  7,  0,  6,  0
 ]);
 
@@ -1195,7 +1195,7 @@ async function animateInitBoard() {
   const dropOrder = DROP_PATTERNS[pick(0,1,2)];
   setHandScale(imgHand);
   await initHandCanvas(imgHand, handW, handH);
-  const homeX = SQPX * 3, homeY = -SQPX * 2; // Off-screen top left
+  homeX = 3 * c; homeY = -handH - c * 0.2; // Off-screen top left
   handX = homeX - handGripX; handY = homeY - handGripY; // hand start ourside board
   await handTo(20, homeX, homeY); // move hand to home position
 
@@ -1441,7 +1441,7 @@ async function runPhase(ms, drawFn) {
     const t0 = performance.now();
     function tick(now) {
       const t = Math.min(1, (now - t0) / ms);
-      const ease = easeInOut(t);
+      const ease = level === 0 ? easeInOut(t) : snapEase(t);
       if (dirty) clearDirty();
       drawFn(ease);
       if (t < 1) requestAnimationFrame(tick);
@@ -1473,12 +1473,6 @@ function drawHand(dx, dy, px, py, img = null) {
   //console.log("h",moveCount, sx, sy, visW, visH, visX, visY, visW, visH);
   animeCtx.drawImage(handCanvas, sx, sy, visW, visH, visX, visY, visW, visH);
   markDirty(visX, visY, visW, visH);
-
-//message(dx+" "+dy+" "+OFFX+" "+OFFY);
-//message(visX+" "+visY+" "+visW+" "+visH);
-//message(pageDX+" "+pageDY+" "+visX+" "+visY+" "+visW+" "+visH+" "+viewW+" "+viewH);
-//message(OFFX+" "+OFFY+" "+SQPX+" "+viewW+" "+viewH);
-
   //message(handCanvas.width+" "+handCanvas.height);
 }
 
@@ -1508,8 +1502,14 @@ function clearDirty(x, y, w, h) {
   dirty = null;
 }
 
-function easeInOut(t) { return t * t * (3 - 2 * t); }
 function bezier(p0, p1, p2, t) { const u=1-t; return u*u*p0 + 2*u*t*p1 + t*t*p2; }
+function easeInOut(t) { return t * t * (3 - 2 * t); }
+function easeOut(t) { return 1 - Math.pow(1 - t, 3.5); }
+function snapEase(t) {
+  if (t < 0.15) { return t * t * 2.5; }
+  if (t < 0.75) { const k = (t - 0.15) / 0.6; return 0.06 + k * 0.84; }
+  const k = (t - 0.75) / 0.25; return 0.9 + (1 - Math.pow(1 - k, 2)) * 0.1;
+}
 
 
 /********************* SOUND ************************
@@ -2051,11 +2051,11 @@ function myeval(){
     //const bEM = ~(bLP | bDP | bLH | bDH) & 0xffffffff; // bit 1 for empty
     //const pa = pc;
     
-    // bonus for E-Pum & Standard for DARK (in case no follow MAK)
+    // bonus for (E-Pum) & Standard for DARK (in case no follow MAK)
     if (pc[5] === D_PWN && pc[3] === D_PWN && pc[21] === D_PWN && pc[19] === D_PWN) {
     //if((pc[5] & pc[3] & pc[21] & pc[19]) === D_PWN){
       score_DARK += 5;
-      if (pc[14] === D_PWN || pc[12] === D_PWN || pc[10] === D_PWN) score_DARK += 8;
+      if (pc[14] === D_PWN || /*pc[12] === D_PWN ||*/ pc[10] === D_PWN) score_DARK += 8;
       if (pc[17] === D_PWN && pc[1] === D_PWN) score_DARK += 8;  // right pieces
       if (pc[28] === D_PWN) score_DARK += 5;                     // piece at top
     }
@@ -2300,7 +2300,7 @@ async function think(){
     curBestMove = pv[0][0], curBestScore = score;
     //console.log(FM(prvBestMove), FM(pv[0][0]));
 
-//console.log(depth,score,FM(pv[0][0]),TO(pv[0][0]));
+//console.log(depth,score,cellToNum[FM(pv[0][0])],cellToNum[TO(pv[0][0])]);
 //console.log("in think, after search: targetDepth",depth,"score",score,"mv",FM(gen_dat[0]),TO(gen_dat[0]));
 
     elapsed = performance.now() - t0;
@@ -2374,23 +2374,27 @@ async function aiMainLoop(){
     let bestmv=0; pv[0][0]=0; prvBestMove=0; curBestMove=0; // reset vars
     if(gen_end[0]===0){ gameOver(1); break; }
     if(gen_end[0]===1){ bestmv=gen_dat[0]; await holdMs(20); }
-    if(moveCount < 4 && bestmv===0){ // force opening moves
+    // force opening moves
+    if(moveCount < 4 && bestmv===0){ 
       bestmv = forceOpeningMove();
-      if(bestmv!==0) { msg+="..."; await holdMs(500); }
+      if(bestmv!==0) { msg+="..."; await holdMs(20); }
     }
-    if(USE_BK && moveCount > 3 && bestmv===0 && chance(0.85)) { // 85% to use opening book
+    // use opening book (85%)
+    if(USE_BK && moveCount > 3 && bestmv===0 && chance(0.85)) { 
       const bk_mv = bkProbe();
       if(bk_mv){
         const f=FM(bk_mv), t=TO(bk_mv);
         for(let i=0; i<gen_end[0]; i++){
           const m = gen_dat[i];
           if(FM(m) === f && TO(m) === t){
-            bestmv = m; msg+=".."; await holdMs(20); //console.log("BK_legal:",f,t);
+            bestmv = m; prvBestMove = curBestMove = m;
+            msg+=".."; await holdMs(20); //console.log("BK_legal:",f,t);
             break;
           }
         }
       }
     }
+    // AI think
     if(bestmv===0){ 
       if(await think()===false){ gameOver(1); break; }
       bestmv=pv[0][0];
@@ -2434,6 +2438,17 @@ async function aiMainLoop(){
   //bCompBusy=false; 
 }
 
+/* ====== 64 ======
+     1   3   5   7
+   8  10  12  14
+    17  19  21  23
+  24  26  28  30
+    33  35  37  39
+  40  42  44  46
+    49  51  53  55
+  56  58  60  62
+  ================ */
+
 function forceOpeningMove() {
   if (DEBUG) return 0;
   let mv = 0;
@@ -2447,7 +2462,8 @@ function forceOpeningMove() {
   } else {
     switch(moveCount) {
       case 1: mv = (14 | RTO(21) | MMOVE); break;
-      case 3: mv = ( 7 | RTO(14) | MMOVE); break;
+      case 3: mv = (pc[35] === EMPTY && pc[37] === EMPTY && chance(0.6)) ?
+                   ( 21 | RTO(28) | MMOVE) : ( 7 | RTO(14) | MMOVE); break;
       //case 5: mv = (12 | RTO(19) | MMOVE); break;
       default: mv = 0;
     }
