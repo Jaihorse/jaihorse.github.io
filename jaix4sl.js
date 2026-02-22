@@ -2379,8 +2379,8 @@ async function aiMainLoop(){
       bestmv = forceOpeningMove();
       if(bestmv!==0) { msg+="..."; await holdMs(20); }
     }
-    // use opening book (85%)
-    if(USE_BK && moveCount > 3 && bestmv===0 && chance(0.85)) { 
+    // use opening book (95%)
+    if(USE_BK && moveCount > 3 && bestmv===0 && chance(0.95)) { 
       const bk_mv = bkProbe();
       if(bk_mv){
         const f=FM(bk_mv), t=TO(bk_mv);
@@ -3136,6 +3136,7 @@ async function loadBKDB(zipUrl = "DB0508.zip", innerFile = "DB0508.txt") {
     }
     //console.log("BOOK LOADED", bkdbLoaded);
     await loadNewBk();
+    clearBoard();
   } catch (err) {
     //console.error("BOOK LOAD FAILED:", err);
   }
