@@ -3109,11 +3109,11 @@ function initZobrist32(seedInit = 123456) {
 
 
 // ---------------- BOOK DATABASE -----------------
-const bk_map = new Map();     // key → bestmove
+const bk_map = new Map();     // key → Map(move → count)
 let bkdbLoaded = 0;
 
 // ---------------- LOAD STANDARD BOOK ----------------------
-async function loadBKDB(zipUrl = "DB0508.zip", innerFile = "DB0508.txt") {
+async function loadBKDB(zipUrl = "DB0509.zip", innerFile = "DB0509.txt") {
   try {
     bk_map.clear(); bkdbLoaded = 0;
     const response = await fetch(zipUrl);
@@ -3130,8 +3130,9 @@ async function loadBKDB(zipUrl = "DB0508.zip", innerFile = "DB0508.txt") {
       const moveHex  = line.substring(16, 21);
       const key = BigInt("0x" + boardHex);
       const mov = Number("0x" + moveHex);
-      if (!bk_map.has(key)) bk_map.set(key, []); // create array
-      bk_map.get(key).push(mov); // add move to array
+      if (!bk_map.has(key)) bk_map.set(key, new Map());
+      const moveMap = bk_map.get(key);
+      moveMap.set(mov, (moveMap.get(mov) || 0) + 1);
       bkdbLoaded++;
     }
     //console.log("BOOK LOADED", bkdbLoaded);
@@ -3167,8 +3168,9 @@ function importNewBkLine(moveStr){
     //console.log(side,mv);
     const key = boardEncode(); // encode BEFORE move
     const packed = packBkMove(mv);
-    if(!bk_map.has(key)) bk_map.set(key,[]);
-    bk_map.get(key).push(packed);
+    if(!bk_map.has(key)) bk_map.set(key, new Map());
+    const moveMap = bk_map.get(key);
+    moveMap.set(packed, (moveMap.get(packed) || 0) + 1);
     bkdbLoaded++;
     applyBkMove(mv);
   }
@@ -3209,15 +3211,28 @@ function doBkCapture(f,t){
 
 function bkProbe() {
   const key = boardEncode();
-  const list = bk_map.get(key);
-  if (!list) return null;
-      /*console.log("BK:", list.map(m=>{
-        const mv = BITS(m) | RTO(63-TO(m)) | (63-FM(m));
-        return `${cellToNum[FM(mv)]}-${cellToNum[TO(mv)]}`;
-      }).join(" , "));*/
-  let mov = list[Math.floor(Math.random() * list.length)];
+  const moveMap = bk_map.get(key);
+  if (!moveMap) return null;
+
+  if(DEBUG) console.log("BK:",
+    [...moveMap.entries()].map(([m,c])=>{
+      return `${cellToNum[63-FM(m)]}-${cellToNum[63-TO(m)]}(${c})`;
+    }).join(" , ")
+  );
+
+  let total = 0; // Weighted random
+  for(const count of moveMap.values()) total += count;
+
+  let r = Math.random() * total, mov = null;
+  for(const [m,count] of moveMap) {
+    if((r -= count) < 0) { mov = m; break; }
+  }
   mov = BITS(mov) | RTO(63-TO(mov)) | (63-FM(mov));
-  //console.log("BK", key.toString(16), list.length, BITS(mov).toString(16), TO(mov), FM(mov));
+
+  if(DEBUG) console.log("BK", key.toString(16), "totalWeight=", total,
+    cellToNum[FM(mov)], cellToNum[TO(mov)]
+  );
+
   return mov;
 }
 
