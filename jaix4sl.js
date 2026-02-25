@@ -3059,41 +3059,6 @@ function egToStr(v){
   return ".";
 }
 
-
-/*
-// Zobrist hash position
-function ttHash32(s) {
-  const zp = zobrist_piece32;
-  let h = 0 >>> 0;
-  for (let i = 0; i < 32; i++) {
-    const sq = pcConv[i];
-    const p  = pc[sq];
-    if (p >= 0 && p < 5) h ^= zp[i][p];
-  }
-  //if (s === DARK) h ^= zobrist_side32;
-  return h >>> 0;
-}
-
-// ---- 32-bit Zobrist (for EGDB) ----
-function rand32(seed) { return (seed * 1664525 + 1013904223) >>> 0; }
-
-let zobrist_piece32 = null; // [sq][p] -> uint32
-let zobrist_side32 = 0;
-
-function initZobrist32(seedInit = 123456) {
-  // seedInit: 32-bit integer seed
-  let seed = seedInit >>> 0;
-  zobrist_piece32 = [];
-  for (let sq = 0; sq < 32; sq++) {
-    zobrist_piece32[sq] = new Uint32Array(6); // p in 0..4 used, keep extra slot safe
-    for (let p = 0; p < 10; p++) {              // allocate a bit extra
-      seed = rand32(seed);
-      zobrist_piece32[sq][p] = seed >>> 0;
-    }
-  }
-  zobrist_side32 = rand32(seed) >>> 0;
-}
-*/
 /* ------------------------ End of Endgame patch ---------------------- */
 
 
@@ -3130,10 +3095,7 @@ async function loadBKDB(zipUrl = "DB0509.zip", innerFile = "DB0509.txt") {
       const moveHex  = line.substring(16, 21);
       const key = BigInt("0x" + boardHex);
       const mov = Number("0x" + moveHex);
-      if (!bk_map.has(key)) bk_map.set(key, new Map());
-      const moveMap = bk_map.get(key);
-      moveMap.set(mov, (moveMap.get(mov) || 0) + 1);
-      bkdbLoaded++;
+      bkStore(key, mov);
     }
     //console.log("BOOK LOADED", bkdbLoaded);
     await loadNewBk();
@@ -3168,10 +3130,7 @@ function importNewBkLine(moveStr){
     //console.log(side,mv);
     const key = boardEncode(); // encode BEFORE move
     const packed = packBkMove(mv);
-    if(!bk_map.has(key)) bk_map.set(key, new Map());
-    const moveMap = bk_map.get(key);
-    moveMap.set(packed, (moveMap.get(packed) || 0) + 1);
-    bkdbLoaded++;
+    bkStore(key, packed);
     applyBkMove(mv);
   }
 }
@@ -3213,27 +3172,30 @@ function bkProbe() {
   const key = boardEncode();
   const moveMap = bk_map.get(key);
   if (!moveMap) return null;
-
   if(DEBUG) console.log("BK:",
     [...moveMap.entries()].map(([m,c])=>{
       return `${cellToNum[63-FM(m)]}-${cellToNum[63-TO(m)]}(${c})`;
-    }).join(" , ")
+    }).join(" ")
   );
-
   let total = 0; // Weighted random
   for(const count of moveMap.values()) total += count;
-
   let r = Math.random() * total, mov = null;
   for(const [m,count] of moveMap) {
     if((r -= count) < 0) { mov = m; break; }
   }
   mov = BITS(mov) | RTO(63-TO(mov)) | (63-FM(mov));
-
-  if(DEBUG) console.log("BK", key.toString(16), "totalWeight=", total,
-    cellToNum[FM(mov)], cellToNum[TO(mov)]
-  );
-
+  if(DEBUG) console.log("BK=", key.toString(16), cellToNum[FM(mov)], cellToNum[TO(mov)] );
   return mov;
+}
+
+const BK_CAP = 5;
+
+function bkStore(key, mov) {
+  if (!bk_map.has(key)) bk_map.set(key, new Map());
+  const moveMap = bk_map.get(key);
+  const oldCount = moveMap.get(mov) || 0;
+  if (oldCount < BK_CAP) moveMap.set(mov, oldCount + 1);
+  bkdbLoaded++;
 }
 
 // Encode the current board, tuned for speed
