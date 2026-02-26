@@ -38,7 +38,7 @@ Zobrist key is 64 bits to avoid key duplication.
 "use strict";
 
 const CODE_VERSION = "x4sl";
-const CODE_DATE = "SL0221";
+const CODE_DATE = "SL0226";
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
@@ -2292,6 +2292,7 @@ async function think(){
   let score=0, depth=1, elapsed=0;
   //prvBestMove = 0; curBestMove = 0;
   const extraDepth = Math.min(MAX_EXTRA_DEPTH, Math.max(0, (16-pieceCount) >> 1));
+  ttClear();
 
   while(true) {
     if(depth >= 10) await yieldThread(depth, score, elapsed, MIN_THINK_MS); // update UI
