@@ -293,6 +293,7 @@ async function startGame() {
     const fm = 14, to = 21, mv = fm | (to << 8);
     await animateMove(mv);
     pc[to] = pc[fm]; pc[fm] = EMPTY; drawPieces(); 
+    moveHistoryStr = "8-11 ";
   }
   recalcPieceCounts(); 
   refreshCanvasBackingStore();
@@ -2024,6 +2025,63 @@ function myeval(){
 //console.log("BUG code", pieceCode);
   }
 
+  /////////////////////////////////////////////////
+
+  // ===== SPECIAL 1103 0311 FORCED WIN PATTERNS =====
+  if (pieceCount === 5) {
+    updatePieceCode();
+    if (pieceCode === 1103 || pieceCode === 311) {
+      const center1 = [1,10,19,28,37,46,55];
+      const above1  = [3,5,7,12,14,21,23,30,39];
+      const face1 = [ [56,40],[58,40],[58,42],[58,33],[51,35],[40,24],[42,24],[42,26],
+          [24,8],[26,8],[42,8],[42,17] ];
+      const center2 = [7,14,21,28,35,42,49,56];
+      const above2  = [1,3,5,8,10,12,17,19,24,26,33,40];
+      const face2 = [ [60,44],[62,46],[53,37],[53,39],[55,39],[37,23],[39,23],[23,7] ];
+
+  /* ====== 64 ======
+       1   3   5   7
+     8  10  12  14
+      17  19  21  23
+    24  26  28  30
+      33  35  37  39
+    40  42  44  46
+      49  51  53  55
+    56  58  60  62
+    ================ */
+
+      const check = (center, above, face, H, P, mirror=false) => {
+        const sq = s => mirror ? 63 - s : s;
+        let c = 0, a = 0, f = 0;
+        for (let s of center) if (pc[sq(s)] === H) c++;
+        for (let s of above)  if (pc[sq(s)] === P) a++;
+        for (let [l,d] of face)
+          if (pc[sq(d)] === P && pc[sq(l)] === (H === L_HRS ? L_PWN : D_PWN)) f++;
+        return (c === 1 && a === 2 && f === 1);
+      };
+
+      // ---- Light win patterns
+      if (
+        check(center1, above1, face1, L_HRS, D_PWN) ||
+        check(center2, above2, face2, L_HRS, D_PWN)
+      ) {
+        //console.log(boardToText());
+        return side_is_L ? 1000 - ply : -1000 + ply;
+      }
+
+      // ---- Dark win (mirrored)
+      if (
+        check(center1, above1, face1, D_HRS, L_PWN, true) ||
+        check(center2, above2, face2, D_HRS, L_PWN, true)
+      ) {
+        //console.log(boardToText());
+        return side_is_L ? -1000 + ply : 1000 - ply;
+      }
+    }
+  }
+
+  /////////////////////////////////////////////////
+
   // === Piece Count Bonus ===
   score_LGHT += (L_PWN_cnt * PWN_VAL + L_HRS_cnt * HRS_VAL);
   score_DARK += (D_PWN_cnt * PWN_VAL + D_HRS_cnt * HRS_VAL_D);
@@ -2752,19 +2810,9 @@ function ttHash() { // for TT
 }
 
 function ttClear() {
-  for (let i = 0; i < TT_SIZE; i++) {
-    tt_keylo[i] = 0;
-    tt_keyhi[i] = 0;
-    tt_depth[i] = 0;
-    tt_flag[i]  = 0;
-    tt_score[i] = 0;
-    tt_move[i]  = 0;
-  }
-  ttHitCnt = 0;
-  ttProbeCnt = 0;
-  ttStoreCnt = 0;
-  ttCollision = 0;
-  //console.log("New game, TT cleared");
+  tt_keylo.fill(0); tt_keyhi.fill(0); tt_depth.fill(0);
+  tt_flag.fill(0);  tt_score.fill(0); tt_move.fill(0);
+  ttHitCnt = ttProbeCnt = ttStoreCnt = ttCollision = 0;
 }
 
 function scoreToTT(score, ply) {
