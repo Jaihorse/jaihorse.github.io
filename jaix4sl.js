@@ -38,14 +38,14 @@ Zobrist key is 64 bits to avoid key duplication.
 "use strict";
 
 const CODE_VERSION = "x4sl";
-const CODE_DATE = "SL0226";
+const CODE_DATE = "SL0228";
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
 const USE_BK = true;
 const USE_TT = true;
 const USE_EG = true;
-const BASE_DEPTH = 10;   // depth for level 1, depth 11 takes 5-10 sec per move
+const BASE_DEPTH = 9;   // depth for level 1, depth 11 takes 5-10 sec per move
 const MAX_LEVEL = 2;
 
 let level = 1, prevLevel = level; // start level
@@ -2029,53 +2029,44 @@ function myeval(){
 
   // ===== SPECIAL 1103 0311 FORCED WIN PATTERNS =====
   if (pieceCount === 5) {
-    updatePieceCode();
-    if (pieceCode === 1103 || pieceCode === 311) {
-      const center1 = [1,10,19,28,37,46,55];
-      const above1  = [3,5,7,12,14,21,23,30,39];
-      const face1 = [ [56,40],[58,40],[58,42],[58,33],[51,35],[40,24],[42,24],[42,26],
-          [24,8],[26,8],[42,8],[42,17] ];
-      const center2 = [7,14,21,28,35,42,49,56];
-      const above2  = [1,3,5,8,10,12,17,19,24,26,33,40];
-      const face2 = [ [60,44],[62,46],[53,37],[53,39],[55,39],[37,23],[39,23],[23,7] ];
 
-  /* ====== 64 ======
-       1   3   5   7
-     8  10  12  14
-      17  19  21  23
-    24  26  28  30
-      33  35  37  39
-    40  42  44  46
-      49  51  53  55
-    56  58  60  62
-    ================ */
-
-      const check = (center, above, face, H, P, mirror=false) => {
-        const sq = s => mirror ? 63 - s : s;
-        let c = 0, a = 0, f = 0;
-        for (let s of center) if (pc[sq(s)] === H) c++;
-        for (let s of above)  if (pc[sq(s)] === P) a++;
-        for (let [l,d] of face)
-          if (pc[sq(d)] === P && pc[sq(l)] === (H === L_HRS ? L_PWN : D_PWN)) f++;
-        return (c === 1 && a === 2 && f === 1);
+    // 1103 → LIGHT WIN
+    if (L_HRS_cnt===1 && L_PWN_cnt===1 && D_HRS_cnt===0 && D_PWN_cnt===3) { 
+      let c,a,f;
+      const check = (center, above, face) => {
+        c = a = f = 0;
+        for (let i=0;i<center.length;i++) if (pc[center[i]] === L_HRS) c++;
+        for (let i=0;i<above.length;i++) if (pc[above[i]] === D_PWN) a++;
+        for (let i=0;i<face.length;i++) {
+          const s0 = face[i][0], s1 = face[i][1];
+          if (pc[s0] === L_PWN && pc[s1] === D_PWN) f++;
+        }
+        return (c===1 && a===2 && f===1);
       };
-
-      // ---- Light win patterns
-      if (
-        check(center1, above1, face1, L_HRS, D_PWN) ||
-        check(center2, above2, face2, L_HRS, D_PWN)
-      ) {
+      if (check(P_CENTER1,P_ABOVE1,P_FACE1) || check(P_CENTER2,P_ABOVE2,P_FACE2)) {
         //console.log(boardToText());
-        return side_is_L ? 1000 - ply : -1000 + ply;
+        //console.log("1103, value=",side_is_L ? 500 - ply : -500 + ply);
+        return side_is_L ? 500 - ply : -500 + ply;
       }
+    }
 
-      // ---- Dark win (mirrored)
-      if (
-        check(center1, above1, face1, D_HRS, L_PWN, true) ||
-        check(center2, above2, face2, D_HRS, L_PWN, true)
-      ) {
-        //console.log(boardToText());
-        return side_is_L ? -1000 + ply : 1000 - ply;
+    // 0311 → DARK WIN
+    if (L_HRS_cnt===0 && L_PWN_cnt===3 && D_HRS_cnt===1 && D_PWN_cnt===1) { 
+      const mirror = 63;
+      let c,a,f;
+      const check = (center, above, face) => {
+        c = a = f = 0;
+        for (let i=0;i<center.length;i++) if (pc[mirror-center[i]] === D_HRS) c++;
+        for (let i=0;i<above.length;i++) if (pc[mirror-above[i]] === L_PWN) a++;
+        for (let i=0;i<face.length;i++) {
+          const s0 = mirror - face[i][0], s1 = mirror - face[i][1];
+          if (pc[s0] === D_PWN && pc[s1] === L_PWN) f++;
+        }
+        return (c===1 && a===2 && f===1);
+      };
+      if (check(P_CENTER1,P_ABOVE1,P_FACE1) || check(P_CENTER2,P_ABOVE2,P_FACE2)) {
+        //console.log("0311, value=",side_is_L ? -500 + ply : 500 - ply);
+        return side_is_L ? -500 + ply : 500 - ply;
       }
     }
   }
@@ -2181,6 +2172,25 @@ function myeval(){
   //evalTime += (performance.now() - t0);
   return (side_is_L ? score_LGHT - score_DARK : score_DARK - score_LGHT);
 }
+
+// =========== eval helpers ============
+
+// ===== 1103 / 0311 FORCED WIN PATTERNS =====
+// Pattern 1
+const P_CENTER1 = [1,10,19,28,37,46,55];
+const P_ABOVE1  = [3,5,7,12,14,21,23,30,39];
+const P_FACE1 = [
+  [56,40],[58,40],[58,42],[58,33],[51,35],[40,24],
+  [42,24],[42,26],[24,8],[26,8],[42,8],[42,17]
+];
+// Pattern 2
+const P_CENTER2 = [7,14,21,28,35,42,49,56];
+const P_ABOVE2  = [1,3,5,8,10,12,17,19,24,26,33,40];
+const P_FACE2 = [
+  [60,44],[62,46],[53,37],[53,39],
+  [55,39],[37,23],[39,23],[23,7]
+];
+
 
 // global objects to accumulate times
 let evalTime = 0, ttTime = 0, genTime = 0;
@@ -2290,20 +2300,22 @@ function quiesce(alpha, beta) {
 
   pv_lgth[ply] = ply;
 
+  /*
   // --- Stand pat evaluation ---
   let stand = myeval();
   if (stand >= beta) return stand; // fail-soft cutoff
   if (stand > alpha) alpha = stand;
+  */
 
   // --- Generate captures ---
   gen(ONLY_BITS);
-  if (gen_end[ply] === gen_begin[ply]) return stand; // quiet position
+  if (gen_end[ply] === gen_begin[ply]) return myeval(); // quiet position
 
-  if (follow_pv) sort_pv();
+  //if (follow_pv) sort_pv();
 
   // --- Search captures ---
   for (let i = gen_begin[ply]; i < gen_end[ply]; i++) {
-    sort(i);
+    //sort(i);
     makemove(gen_dat[i]);
     let score = -quiesce(-beta, -alpha);
     takeback();
@@ -2897,7 +2909,7 @@ function egHash() {
   const conv = isLght ? pcConv : pcFlip;
   let h = 0n;
   for (let i = 0; i < 32; i++) {
-    const sq = pcConv[i];
+    const sq = conv[i]; //pcConv[i];
     const zpSq = zp[i];
     let p = pc[sq];
     if(p >= 4 || p < 0) continue; // p is not pieces or empty
