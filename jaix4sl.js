@@ -38,7 +38,7 @@ Zobrist key is 64 bits to avoid key duplication.
 "use strict";
 
 const CODE_VERSION = "x4sl";
-const CODE_DATE = "SL0228";
+const CODE_DATE = "SL0302";
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
@@ -77,56 +77,33 @@ const pc_init = new Int32Array([
   0, 5, 0, 5, 0, 5, 0, 5
 ]);
 
+const pc_init_debug = pc_init;
+
 /*/
 
-const pc_init = new Int32Array([  // 6p
-  5, 1, 5, 4, 5, 4, 5, 4,
-  0, 5, 4, 5, 4, 5, 4, 5,
-  5, 4, 5, 4, 5, 2, 5, 1,
-  4, 5, 1, 5, 4, 5, 4, 5,
-  5, 4, 5, 4, 5, 0, 5, 4,
-  1, 5, 4, 5, 4, 5, 4, 5,
-  5, 4, 5, 4, 5, 4, 5, 4,
-  4, 5, 4, 5, 4, 5, 4, 5
-]);
-
-//
-
-const pc_init = new Int32Array([  // 2p
-  5, 4, 5, 4, 5, 1, 5, 4,
+const pc_init_debug = new Int32Array([  // 6p
+  5, 4, 5, 4, 5, 1, 5, 3,
   4, 5, 0, 5, 4, 5, 4, 5,
+  5, 0, 5, 4, 5, 4, 5, 4,
+  4, 5, 4, 5, 4, 5, 4, 5,
   5, 4, 5, 4, 5, 4, 5, 4,
   4, 5, 4, 5, 4, 5, 4, 5,
-  5, 4, 5, 0, 5, 4, 5, 3,
-  4, 5, 4, 5, 0, 5, 4, 5,
   5, 4, 5, 4, 5, 4, 5, 4,
   4, 5, 4, 5, 4, 5, 4, 5
 ]);
 
-//
-
-const pc_init = new Int32Array([  // 2p
-  5, 4, 5, 4, 5, 1, 5, 4,
-  4, 5, 0, 5, 4, 5, 4, 5,
-  5, 4, 5, 4, 5, 4, 5, 4,
-  2, 5, 4, 5, 0, 5, 4, 5,
-  5, 4, 5, 4, 5, 4, 5, 3,
-  4, 5, 0, 5, 4, 5, 4, 5,
-  5, 4, 5, 4, 5, 4, 5, 4,
-  4, 5, 4, 5, 4, 5, 4, 5
-]);
 
 //
 
-const pc_init = new Int32Array([  // 2p
+const pc_init_debug = new Int32Array([  // 6p
   5, 4, 5, 4, 5, 4, 5, 4,
-  4, 5, 4, 5, 4, 5, 3, 5,
+  4, 5, 4, 5, 4, 5, 4, 5,
+  5, 4, 5, 0, 5, 4, 5, 4,
+  4, 5, 4, 5, 4, 5, 4, 5,
+  5, 4, 5, 3, 5, 4, 5, 1,
+  4, 5, 4, 5, 4, 5, 4, 5,
   5, 4, 5, 4, 5, 4, 5, 4,
-  2, 5, 1, 5, 4, 5, 1, 5,
-  5, 4, 5, 4, 5, 4, 5, 4,
-  4, 5, 4, 5, 0, 5, 4, 5,
-  5, 4, 5, 4, 5, 4, 5, 4,
-  4, 5, 4, 5, 4, 5, 4, 5
+  4, 5, 4, 5, 0, 5, 4, 5
 ]);
 
 /*/
@@ -254,8 +231,9 @@ function waitForAssets() { // wait for images, egdb, and bkdb loading complete
   if (!imagesLoaded || egdbLoaded===0 || bkdbLoaded===0) { 
     setTimeout(waitForAssets, 200); return; 
   }
-  fetch(VISIT_LOG_URL + "level=" + CODE_DATE + "&result=" +
-      egdbLoaded + "&moves=" + bkdbLoaded);
+  const s = "level=" + CODE_DATE + "&result=" + egdbLoaded + "&moves=" + bkdbLoaded;
+  if(DEBUG) console.log(s);
+  fetch(VISIT_LOG_URL + s);
   clearBoard(); startGame(); //resizeAllCanvases();
   message("by Jaroonsak Wangviwat"); 
 }
@@ -268,9 +246,10 @@ async function startGame() {
   initEngineState(); initCellOffsets();
   pieceSelected = false; selectedCell = -1; selectedTo = -1;
   dragX = dragY = 0; wasDragging = false;
-  await animateInitBoard(); //await warmUp(500);
-  initCaptureSlots(); 
-  initBoard(); drawBoard(); drawPieces(); 
+  if(!DEBUG) await animateInitBoard(); //await warmUp(500);
+  initCaptureSlots(); initBoard();
+  if(DEBUG) { pc.set(pc_init_debug); gen(GEN_ALL); }
+  drawBoard(); drawPieces(); 
 
   message("Jaihorse makhos.com"); version(CODE_VERSION+" level "+level); 
   showNewGame(false); showStyleIcon(); //await warmUp(500); 
@@ -2007,67 +1986,74 @@ function myeval(){
 //console.log("z", zkey.toString(36),"s",side,"ply",ply,"v",dval);
 //console.log("HIT!!!! in db, dval",dval);
 //console.log(boardToText());
-
       egHitCnt++;
+      /*
       if (dval === EG_W) return side_is_L ?  1000 - score_pc - ply : -1000 + score_pc + ply;
       if (dval === EG_L) return side_is_L ? -1000 + score_pc + ply :  1000 - score_pc - ply;
-      //if (dval === EG_D) return side_is_L ?         score_pc       :        -score_pc;
       if (dval === EG_D) return side_is_L ? drawBias : -drawBias;
+      */
+      // debug 2-Mar, EG_x for L to move. If side is D then result is D, D & D is L.
+      if (dval === EG_W) return  1000 - score_pc - ply;
+      if (dval === EG_L) return -1000 + score_pc + ply;
+      if (dval === EG_D) return drawBias;
     }
 
     // fallback if no rec in egdb
     const xval = getdx(pieceCode);
-//console.log("no db, code",pieceCode,"xval",xval);
     if (xval === EG_W) return side_is_L ?  1000 - score_pc - ply : -1000 + score_pc + ply;
     if (xval === EG_L) return side_is_L ? -1000 + score_pc + ply :  1000 - score_pc - ply;
-    //if (xval === EG_D) return side_is_L ?         score_pc       :       -score_pc;
     if (xval === EG_D) return side_is_L ? drawBias : -drawBias;
-//console.log("BUG code", pieceCode);
   }
 
   /////////////////////////////////////////////////
 
   // ===== SPECIAL 1103 0311 FORCED WIN PATTERNS =====
-  if (pieceCount === 5) {
-
-    // 1103 → LIGHT WIN
-    if (L_HRS_cnt===1 && L_PWN_cnt===1 && D_HRS_cnt===0 && D_PWN_cnt===3) { 
-      let c,a,f;
-      const check = (center, above, face) => {
-        c = a = f = 0;
-        for (let i=0;i<center.length;i++) if (pc[center[i]] === L_HRS) c++;
-        for (let i=0;i<above.length;i++) if (pc[above[i]] === D_PWN) a++;
-        for (let i=0;i<face.length;i++) {
-          const s0 = face[i][0], s1 = face[i][1];
-          if (pc[s0] === L_PWN && pc[s1] === D_PWN) f++;
-        }
-        return (c===1 && a===2 && f===1);
-      };
-      if (check(P_CENTER1,P_ABOVE1,P_FACE1) || check(P_CENTER2,P_ABOVE2,P_FACE2)) {
-        //console.log(boardToText());
-        //console.log("1103, value=",side_is_L ? 500 - ply : -500 + ply);
-        return side_is_L ? 500 - ply : -500 + ply;
-      }
+  // 1103 → LIGHT WIN
+  if (pieceCount===5 && L_HRS_cnt===1 && L_PWN_cnt===1 && D_HRS_cnt===0 && D_PWN_cnt===3) { 
+    if (checkPattern(P_CENTER1,P_ABOVE1,P_FACE1) || 
+        checkPattern(P_CENTER2,P_ABOVE2,P_FACE2) ) {
+      if(DEBUG)console.log("1103, value=",side_is_L ? 500 - ply : -500 + ply);
+      return side_is_L ? 500 - ply : -500 + ply;
     }
-
-    // 0311 → DARK WIN
-    if (L_HRS_cnt===0 && L_PWN_cnt===3 && D_HRS_cnt===1 && D_PWN_cnt===1) { 
-      const mirror = 63;
-      let c,a,f;
-      const check = (center, above, face) => {
-        c = a = f = 0;
-        for (let i=0;i<center.length;i++) if (pc[mirror-center[i]] === D_HRS) c++;
-        for (let i=0;i<above.length;i++) if (pc[mirror-above[i]] === L_PWN) a++;
-        for (let i=0;i<face.length;i++) {
-          const s0 = mirror - face[i][0], s1 = mirror - face[i][1];
-          if (pc[s0] === D_PWN && pc[s1] === L_PWN) f++;
-        }
-        return (c===1 && a===2 && f===1);
-      };
-      if (check(P_CENTER1,P_ABOVE1,P_FACE1) || check(P_CENTER2,P_ABOVE2,P_FACE2)) {
-        //console.log("0311, value=",side_is_L ? -500 + ply : 500 - ply);
-        return side_is_L ? -500 + ply : 500 - ply;
-      }
+  }
+  // 0311 → DARK WIN
+  if (pieceCount===5 && L_HRS_cnt===0 && L_PWN_cnt===3 && D_HRS_cnt===1 && D_PWN_cnt===1) {
+    if (checkPattern(P_CENTER1,P_ABOVE1,P_FACE1,true) ||
+        checkPattern(P_CENTER2,P_ABOVE2,P_FACE2,true) ) {
+      if(DEBUG)console.log("0311, value=",side_is_L ? -500 + ply : 500 - ply);
+      return side_is_L ? -500 + ply : 500 - ply;
+    }
+  }
+  // 1204 → LIGHT WIN
+  if (pieceCount===7 && L_HRS_cnt===1 && L_PWN_cnt===2 && D_HRS_cnt===0 && D_PWN_cnt===4) {
+    if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,2) ||
+        checkTwoFacePairs(P_CENTER2,P_ABOVE2,P_FACE2PAIRS2,2) ) {
+      if(DEBUG)console.log("1204, value=",side_is_L ? 500 - ply : -500 + ply);
+      return side_is_L ? 500 - ply : -500 + ply;
+    }
+  }
+  // 0412 → DARK WIN
+  if (pieceCount===7 && L_HRS_cnt===0 && L_PWN_cnt===4 && D_HRS_cnt===1 && D_PWN_cnt===2) {
+    if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,2,true) ||
+        checkTwoFacePairs(P_CENTER2,P_ABOVE2,P_FACE2PAIRS2,2,true) ) {
+      if(DEBUG)console.log("0412, value=",side_is_L ? -500 + ply : 500 - ply);
+      return side_is_L ? -500 + ply : 500 - ply;
+    }
+  }
+  // 1203 → LIGHT WIN
+  if (pieceCount===6 && L_HRS_cnt===1 && L_PWN_cnt===2 && D_HRS_cnt===0 && D_PWN_cnt===3) {
+    if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,1) ||
+        checkTwoFacePairs(P_CENTER2,P_ABOVE2,P_FACE2PAIRS2,1) ) {
+      if(DEBUG)console.log("1203, value=",side_is_L ? 500 - ply : -500 + ply);
+      return side_is_L ? 500 - ply : -500 + ply;
+    }
+  }
+  // 0312 → DARK WIN
+  if (pieceCount===6 && L_HRS_cnt===0 && L_PWN_cnt===3 && D_HRS_cnt===1 && D_PWN_cnt===2) {
+    if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,1,true) ||
+        checkTwoFacePairs(P_CENTER2,P_ABOVE2,P_FACE2PAIRS2,1,true) ) {
+      if(DEBUG)console.log("0312, value=",side_is_L ? -500 + ply : 500 - ply);
+      return side_is_L ? -500 + ply : 500 - ply;
     }
   }
 
@@ -2136,37 +2122,6 @@ function myeval(){
     }
     // light pawn is blocked by dark pawn at the back
     if (pc[62] == L_PWN && pc[55] == D_PWN) score_LGHT += 15;
-    //if (pc[58] == L_PWN && pc[40] == D_PWN) score_LGHT += 10;
-
-    // allow Horse penalty for LGHT
-    /*
-    if(pc[63-17] == L_PWN) {
-      if   (pc[63-1] == EMPTY && pc[63-8] == EMPTY)     score_DARK += 17;
-      else if(pc[63-1] == EMPTY && pc[63-3] == EMPTY)     score_DARK += 16;
-      else if(pc[63-3] == EMPTY)            score_DARK += 8;
-    }
-    if(pc[63-19] == L_PWN) {
-      if   (pc[63-3] == EMPTY && pc[63-1] == EMPTY)     score_DARK += 17;
-      else if(pc[63-3] == EMPTY && pc[63-5] == EMPTY)     score_DARK += 17;
-      else if(pc[63-3] == EMPTY && pc[63-1] == L_PWN && pc[63-5] == L_PWN)
-                          score_DARK += 8;
-      else if(pc[63-1] == EMPTY && pc[63-3] == L_PWN && pc[63-8] == L_PWN)
-                          score_DARK += 8;
-      else if(pc[63-1] == L_PWN && pc[63-3] == L_PWN)     score_DARK += 8;
-    }
-    if(pc[63-21] == L_PWN){
-      if   (pc[63-5] == EMPTY && pc[63-3] == EMPTY)     score_DARK += 17;
-      else if(pc[63-5] == EMPTY && pc[63-7] == EMPTY)     score_DARK += 17;
-      else if(pc[63-5] == EMPTY && pc[63-3] == L_PWN && pc[63-7] == L_PWN)
-                          score_DARK += 8;
-      else if(pc[63-3] == EMPTY && pc[63-5] == L_PWN && pc[63-7] == L_PWN)
-                          score_DARK += 8;
-    }
-    if(pc[63-23] == L_PWN){
-      if   (pc[63-5] == EMPTY && pc[63-7] == EMPTY)     score_DARK += 15;
-    }
-    */
-
   }
 
   //evalTime += (performance.now() - t0);
@@ -2180,16 +2135,110 @@ function myeval(){
 const P_CENTER1 = [1,10,19,28,37,46,55];
 const P_ABOVE1  = [3,5,7,12,14,21,23,30,39];
 const P_FACE1 = [
-  [56,40],[58,40],[58,42],[58,33],[51,35],[40,24],
-  [42,24],[42,26],[24,8],[26,8],[42,8],[42,17]
+  [56,40],[58,40],[58,42],[58,33],[58,24],[51,35],
+  [40,24],[42,24],[42,26],[42,17],[42, 8],[24, 8],[26, 8]
 ];
 // Pattern 2
 const P_CENTER2 = [7,14,21,28,35,42,49,56];
 const P_ABOVE2  = [1,3,5,8,10,12,17,19,24,26,33,40];
-const P_FACE2 = [
-  [60,44],[62,46],[53,37],[53,39],
-  [55,39],[37,23],[39,23],[23,7]
+const P_FACE2 = [ [62,55],[53,37],[53,39],[55,39],[37,23],[39,23] ];
+
+// ===== 1204 / 0412 FORCED WIN PATTERNS =====
+// Pattern 1
+const P_FACE2PAIRS1 = [ // not sure about [60,44]
+  [[56,40],[24, 8]],[[58,40],[24, 8]],[[58,42],[24, 8]],
+  [[56,40],[26, 8]],[[58,40],[26, 8]],[[58,42],[26, 8]],
+  [[56,40],[42,24]],[[58,40],[42,24]],[[58,40],[42,26]]
 ];
+// Pattern 2
+const P_FACE2PAIRS2 = [
+  //[[60,44],[39,23]],[[60,44],[37,23]], // not sure about [60,44]
+  //[[62,46],[39,23]],[[62,46],[37,23]],
+  [[62,55],[39,23]],[[53,39],[37,23]]
+];
+
+function checkPattern(center, above, face, mirror=false) {
+  const winHRS = mirror ? D_HRS : L_HRS;
+  const winPWN = mirror ? D_PWN : L_PWN;
+  const oppPWN = mirror ? L_PWN : D_PWN;
+  const m = mirror ? 63 : 0;
+
+  // ---- center: exactly 1 winHRS and nothing else
+  let hrs = 0;
+  for (let i = 0; i < center.length; i++) {
+    const sq = mirror ? m - center[i] : center[i];
+    const p = pc[sq];
+    if (p !== EMPTY) {
+      if (p === winHRS) hrs++;
+      else return false;          // any other piece → fail immediately
+    }
+  }
+  if (hrs !== 1) return false;
+
+  // ---- above: exactly 2 opponent pawns and nothing else
+  let cnt = 0;
+  for (let i = 0; i < above.length; i++) {
+    const sq = mirror ? m - above[i] : above[i];
+    const p = pc[sq];
+    if (p !== EMPTY) {
+      if (p === oppPWN) cnt++;
+      else return false;          // any other piece → fail
+    }
+  }
+  if (cnt !== 2) return false;
+
+  // ---- facing pawn pairs (only need first valid pair)
+  for (let i = 0; i < face.length; i++) {
+    const s0 = mirror ? m - face[i][0] : face[i][0];
+    const s1 = mirror ? m - face[i][1] : face[i][1];
+    if (pc[s0] === winPWN && pc[s1] === oppPWN) return true; // first valid pair
+  }
+  return false; // no pair found
+}
+
+function checkTwoFacePairs(center, above, face2pairs, aboveCnt, mirror=false) {
+  const winHRS = mirror ? D_HRS : L_HRS;
+  const winPWN = mirror ? D_PWN : L_PWN;
+  const oppPWN = mirror ? L_PWN : D_PWN;
+  const m = mirror ? 63 : 0;
+
+  // ---- center = exactly 1 winning HRS and nothing else
+  let hrs = 0;
+  for (let i = 0; i < center.length; i++) {
+    const sq = mirror ? m - center[i] : center[i];
+    const p = pc[sq];
+    if (p !== EMPTY) {
+      if (p === winHRS) hrs++;
+      else return false;
+    }
+  }
+  if (hrs !== 1) return false;
+
+  // ---- above pawn count
+  let a = 0;
+  for (let i = 0; i < above.length; i++) {
+    const sq = mirror ? m - above[i] : above[i];
+    if (pc[sq] === oppPWN) a++;
+  }
+  if (a !== aboveCnt) return false;
+
+  // ---- check any valid 2-pair combo
+  for (let k = 0; k < face2pairs.length; k++) {
+    const p1 = face2pairs[k][0];
+    const p2 = face2pairs[k][1];
+    const s10 = mirror ? m - p1[0] : p1[0];
+    const s11 = mirror ? m - p1[1] : p1[1];
+    const s20 = mirror ? m - p2[0] : p2[0];
+    const s21 = mirror ? m - p2[1] : p2[1];
+    if (
+      pc[s10] === winPWN && pc[s11] === oppPWN &&
+      pc[s20] === winPWN && pc[s21] === oppPWN
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 
 // global objects to accumulate times
@@ -2297,33 +2346,19 @@ function search(alpha, beta, depth) {
 
 
 function quiesce(alpha, beta) {
-
   pv_lgth[ply] = ply;
-
-  /*
-  // --- Stand pat evaluation ---
-  let stand = myeval();
-  if (stand >= beta) return stand; // fail-soft cutoff
-  if (stand > alpha) alpha = stand;
-  */
-
   // --- Generate captures ---
   gen(ONLY_BITS);
   if (gen_end[ply] === gen_begin[ply]) return myeval(); // quiet position
-
-  //if (follow_pv) sort_pv();
-
   // --- Search captures ---
   for (let i = gen_begin[ply]; i < gen_end[ply]; i++) {
-    //sort(i);
     makemove(gen_dat[i]);
     let score = -quiesce(-beta, -alpha);
     takeback();
     if (score >= beta) return score; // fail-soft beta cutoff
     if (score > alpha) { alpha = score; update_pv(i); }
   }
-
-  return alpha;                // best capture line
+  return alpha; // best capture line
 }
 
 
@@ -2362,28 +2397,22 @@ async function think(){
   let score=0, depth=1, elapsed=0;
   //prvBestMove = 0; curBestMove = 0;
   const extraDepth = Math.min(MAX_EXTRA_DEPTH, Math.max(0, (16-pieceCount) >> 1));
-  ttClear();
+  //ttClear(); // 2-Mar, go back to use previous move's TT
 
   while(true) {
     if(depth >= 10) await yieldThread(depth, score, elapsed, MIN_THINK_MS); // update UI
     prvBestMove = curBestMove;
     follow_pv = true; score = search(MINALPHA, MAXBETA, depth);
     curBestMove = pv[0][0], curBestScore = score;
-    //console.log(FM(prvBestMove), FM(pv[0][0]));
-
-//console.log(depth,score,cellToNum[FM(pv[0][0])],cellToNum[TO(pv[0][0])]);
-//console.log("in think, after search: targetDepth",depth,"score",score,"mv",FM(gen_dat[0]),TO(gen_dat[0]));
-
+//console.log(FM(prvBestMove), FM(pv[0][0]));
+    if(DEBUG)console.log(depth,score,cellToNum[FM(pv[0][0])],cellToNum[TO(pv[0][0])]);
     elapsed = performance.now() - t0;
     if(elapsed >= MAX_THINK_MS) break; // time limit
-    if(depth >= targetDepth && score < -9988) return false; // mate loss
+    if(depth >= targetDepth && score < -9969) return false; // mate loss 9988
     if(depth >= targetDepth && elapsed >= MIN_THINK_MS
       && (score <= -300 || score >= 300 || depth >= targetDepth + extraDepth)) break;
     if(DEBUG && depth >= targetDepth) break;
     depth++;
-
-//console.log("in think, after search: targetDepth",depth,"score",score,"mv",FM(gen_dat[0]),TO(gen_dat[0]));
-
   }
   if(score>200) { showStyleIconIcon(false); showNewGame(true); }
   thinkTime = performance.now() - t0; // end total time
