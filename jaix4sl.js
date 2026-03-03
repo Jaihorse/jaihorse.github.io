@@ -38,7 +38,7 @@ Zobrist key is 64 bits to avoid key duplication.
 "use strict";
 
 const CODE_VERSION = "x4sl";
-const CODE_DATE = "SL0302";
+const CODE_DATE = "SL0303";
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
@@ -259,24 +259,24 @@ async function startGame() {
   await showOverlayText("Level "+level, 500);
   if (level===0 && prevLevel===0) {
     await showOverlayText("ต่อให้", 250);
-    //const cell = pick(8, 10, 12); 
     await animateGivePiece();
-    //pc[cell]=EMPTY; 
-    drawPieces(); await warmUp(500); 
+    drawPieces(); await warmUp(250);
   }
   resetClock(); updateTimeDisplay();
   showStyleIconIcon(true);
   await showOverlayText(compFirst ? "คุณเดินหลัง" : "คุณเดินก่อน", 250);
-
-  if (compFirst) { // if dark moves first
-    const fm = 14, to = 21, mv = fm | (to << 8);
-    await animateMove(mv);
-    pc[to] = pc[fm]; pc[fm] = EMPTY; drawPieces(); 
-    moveHistoryStr = "8-11 ";
-  }
+  if (compFirst) animateFirstMove();
   recalcPieceCounts(); 
   refreshCanvasBackingStore();
   bCompBusy = false;
+}
+
+// if compfirst then move 8-11
+async function animateFirstMove() {
+  const fm = 14, to = 21, mv = fm | (to << 8);
+  await animateMove(mv);
+  pc[to] = pc[fm]; pc[fm] = EMPTY; drawPieces(); 
+  moveHistoryStr = "8-11 ";
 }
 
 async function warmUp(ms) {
@@ -881,7 +881,7 @@ async function animateMove(mv, startX = null, startY = null) {
   const pickX = fmX, pickY = fmY, dropX = toX, dropY = toY;
 
   await initHandCanvas(imgHand, handW, handH);
-  homeX = (PFILE(toCell) / 2) * c, homeY = -handH - c * 0.2; // Off-screen top left
+  homeX = (PFILE(toCell) / 2) * c, homeY = -c * 2; // Off-screen top left
   handX = homeX - handGripX; handY = homeY - handGripY; // hand start ourside board
   await handTo(20, homeX, homeY); // reset hand to home position
 
@@ -985,10 +985,10 @@ async function animateMove(mv, startX = null, startY = null) {
       await holdMs();
     }
     // --- Hand away ---
-    await handTo(HFAST * spd, -c * 2, homeY);
+    await handTo(PAUSE, -c * 2, homeY);
   } else {
     // --- Hand away ---
-    await handTo(HFAST * spd, homeX, homeY);
+    await handTo(PAUSE, homeX, homeY);
   }
 
   // --- Promote ---
@@ -996,12 +996,12 @@ async function animateMove(mv, startX = null, startY = null) {
     // 1) hand returns with new piece
     const promoImg = images[boardStyle][imgP(D_PWN)];
     //await handTo(HFAST * spd, dropX, dropY, 0, promoImg,null,null, null,null,SOUND_HIT);
-    await handDropPiece(HFAST * spd, dropX, dropY, 0, promoImg, SOUND_HIT);
+    await handDropPiece(HFAST/2 * spd, dropX, dropY, 0, promoImg, SOUND_HIT);
     await holdMs();
     // 2) draw promoted piece
     drawPiece(D_HRS, toCell);
     // 3) hand leaves again
-    await handTo(HFAST * spd, homeX, homeY);
+    await handTo(PAUSE, homeX, homeY);
   }
 }
 
@@ -1972,7 +1972,6 @@ function myeval(){
     const zkey = egHash(); // 63 bit zobrist
     const dval = egProbe(zkey);
 
-    // COMLEXITY STYLES: level 0 draw quick, level 2 stubborn to draw
     let drawBias = 0;
     if (level === 0 || level >= 2) {
       const bal = (L_PWN_cnt + L_HRS_cnt) - (D_PWN_cnt + D_HRS_cnt);
@@ -1987,6 +1986,7 @@ function myeval(){
 //console.log("HIT!!!! in db, dval",dval);
 //console.log(boardToText());
       egHitCnt++;
+      // COMLEXITY STYLES: level 0 draw quick, level 2 stubborn to draw
       /*
       if (dval === EG_W) return side_is_L ?  1000 - score_pc - ply : -1000 + score_pc + ply;
       if (dval === EG_L) return side_is_L ? -1000 + score_pc + ply :  1000 - score_pc - ply;
@@ -2002,7 +2002,7 @@ function myeval(){
     const xval = getdx(pieceCode);
     if (xval === EG_W) return side_is_L ?  1000 - score_pc - ply : -1000 + score_pc + ply;
     if (xval === EG_L) return side_is_L ? -1000 + score_pc + ply :  1000 - score_pc - ply;
-    if (xval === EG_D) return side_is_L ? drawBias : -drawBias;
+    if (xval === EG_D) return drawBias;
   }
 
   /////////////////////////////////////////////////
@@ -2408,7 +2408,7 @@ async function think(){
     if(DEBUG)console.log(depth,score,cellToNum[FM(pv[0][0])],cellToNum[TO(pv[0][0])]);
     elapsed = performance.now() - t0;
     if(elapsed >= MAX_THINK_MS) break; // time limit
-    if(depth >= targetDepth && score < -9969) return false; // mate loss 9988
+    if(depth >= targetDepth && score < -9986) return false; // mate loss 9988
     if(depth >= targetDepth && elapsed >= MIN_THINK_MS
       && (score <= -300 || score >= 300 || depth >= targetDepth + extraDepth)) break;
     if(DEBUG && depth >= targetDepth) break;
