@@ -3634,7 +3634,7 @@ const DB0303_LOG_URL = "https://chnp.co.th/makhos/store0303.php";
 
 const TB_CLASSES = {
   "0303": {
-    file: "db0303.txt",
+    file: "DB0303.txt",
     lght: { pwn: 3, hrs: 0 },
     dark: { pwn: 3, hrs: 0 },
     map: db0303,
@@ -3643,7 +3643,7 @@ const TB_CLASSES = {
     //probe: probe0303
   },
   "1212": {
-    file: "db1212.txt",
+    file: "DB1212.txt",
     lght: { pwn: 2, hrs: 1 },
     dark: { pwn: 2, hrs: 1 },
     map: db1212,
@@ -3652,7 +3652,7 @@ const TB_CLASSES = {
     //probe: probe1212
   },
   "2121": {
-    file: "db2121.txt",
+    file: "DB2121.txt",
     lght: { pwn: 1, hrs: 2 },
     dark: { pwn: 1, hrs: 2 },
     map: db2121,
