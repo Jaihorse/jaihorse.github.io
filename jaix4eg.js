@@ -82,18 +82,62 @@ const pc_init_debug = pc_init;
 /*/
 
 const pc_init_debug = new Int32Array([  // 6p
-  5, 4, 5, 4, 5, 1, 5, 3,
-  4, 5, 0, 5, 4, 5, 4, 5,
-  5, 0, 5, 4, 5, 4, 5, 4,
-  4, 5, 4, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 4,
+  4, 5, 3, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 3,
+  1, 5, 4, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 4,
+  0, 5, 4, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 2, 5, 4,
+  4, 5, 0, 5, 0, 5, 4, 5
+]);
+
+//
+
+const pc_init_debug = new Int32Array([  // 6p
   5, 4, 5, 4, 5, 4, 5, 4,
   4, 5, 4, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 0,
+  1, 5, 4, 5, 3, 5, 4, 5,
   5, 4, 5, 4, 5, 4, 5, 4,
-  4, 5, 4, 5, 4, 5, 4, 5
+  0, 5, 4, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 1,
+  4, 5, 4, 5, 4, 5, 2, 5
+]);
+
+const pc_init_debug = new Int32Array([  // 6p
+  5, 2, 5, 4, 5, 4, 5, 4,
+  4, 5, 4, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 0,
+  1, 5, 4, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 4,
+  0, 5, 4, 5, 4, 5, 3, 5,
+  5, 4, 5, 1, 5, 4, 5, 1,
+  4, 5, 4, 5, 4, 5, 2, 5
+]);
+
+const pc_init_debug = new Int32Array([  // 6p
+  5, 4, 5, 4, 5, 4, 5, 4,
+  4, 5, 4, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 0,
+  1, 5, 4, 5, 3, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 4,
+  0, 5, 4, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 4,
+  4, 5, 4, 5, 2, 5, 3, 5
 ]);
 
 
-//
+const pc_init_debug = new Int32Array([  // 6p
+  5, 4, 5, 4, 5, 4, 5, 4,
+  4, 5, 4, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 0,
+  4, 5, 3, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 2, 5, 4,
+  1, 5, 3, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 4,
+  4, 5, 0, 5, 4, 5, 0, 5
+]);
 
 const pc_init_debug = new Int32Array([  // 6p
   5, 4, 5, 4, 5, 4, 5, 4,
@@ -108,11 +152,12 @@ const pc_init_debug = new Int32Array([  // 6p
 
 /*/
 
-
-const pc = new Int32Array([
+const pc_clear = new Int32Array([
   5,4,5,4,5,4,5,4, 4,5,4,5,4,5,4,5, 5,4,5,4,5,4,5,4, 4,5,4,5,4,5,4,5, 
   5,4,5,4,5,4,5,4, 4,5,4,5,4,5,4,5, 5,4,5,4,5,4,5,4, 4,5,4,5,4,5,4,5
 ]);
+
+const pc = new Int32Array(pc_clear);
 
 const pcsq_init = new Int32Array([
    0,  0,  0,  0,  0,  0,  0,  0,
@@ -215,7 +260,8 @@ let pv = new Array(HIST_STACK), pv_lgth = new Array(HIST_STACK);
  *************************************************/
 
 function init(){ 
-  initArrays(); loadImages(); loadBKDB(); loadEGDB(); waitForAssets();
+  initArrays(); loadImages(); loadBKDB(); 
+  load4PDB(); load5PDB(); waitForAssets();
 }
 
 function initArrays() {
@@ -227,11 +273,12 @@ function initArrays() {
   initDomRefs(); initZobrist(); 
 }
 
-function waitForAssets() { // wait for images, egdb, and bkdb loading complete
-  if (!imagesLoaded || egdbLoaded===0 || bkdbLoaded===0) { 
+function waitForAssets() {
+  if (!imagesLoaded || eg4pLoaded === 0 || eg5pLoaded === 0 || bkdbLoaded === 0) {
     setTimeout(waitForAssets, 200); return; 
   }
-  const s = "level=" + CODE_DATE + "&result=" + egdbLoaded + "&moves=" + bkdbLoaded;
+  const s = "level=" + CODE_DATE + "&result=" + eg4pLoaded + "-" + eg5pLoaded
+            + "&moves=" + bkdbLoaded;
   if(DEBUG) console.log(s);
   fetch(VISIT_LOG_URL + s);
   clearBoard(); startGame(); //resizeAllCanvases();
@@ -979,7 +1026,7 @@ async function animateMove(mv, startX = null, startY = null) {
     if (slotIdx != null && slotIdx.idx != null) {
       const { idx, x: slotX, y: slotY } = slotIdx; // get slot offset XY
       //await handTo(HSLOW * spd, slotX, slotY, arc / 3, capImg);
-      await handDropPiece(HFAST, slotX, slotY, arc / 3, capImg);
+      await handDropPiece(PAUSE, slotX, slotY, arc / 3, capImg);
       storeCapturedPiece(DARK, idx, imgP(capPiece));
       drawCapturedSlots();
       await holdMs();
@@ -1932,13 +1979,13 @@ const D_CNT_BONUS = 2; // comp to keep dark pieces
 
 
 function myeval(){
-  const side_is_L = (side === LGHT);
+  const sideIsL = (side === LGHT);
   //const pa = pc, conv = pcConv;
-  let score_LGHT=0, score_DARK=0;
+  let score_LGHT=0, score_DARK=0, scorePc=0;
 
   // --- no piece, terminal ---
-  if ((L_PWN_cnt | L_HRS_cnt) === 0) return side_is_L ? -MAXBETA + ply :  MAXBETA - ply;
-  if ((D_PWN_cnt | D_HRS_cnt) === 0) return side_is_L ?  MAXBETA - ply : -MAXBETA + ply;
+  if ((L_PWN_cnt | L_HRS_cnt) === 0) return sideIsL ? -MAXBETA+ply :  MAXBETA-ply;
+  if ((D_PWN_cnt | D_HRS_cnt) === 0) return sideIsL ?  MAXBETA-ply : -MAXBETA+ply;
 
   // score based on position of pieces
   const table = (moveCount < MID_GAME) ? pcsq : pcsq_end;
@@ -1952,32 +1999,34 @@ function myeval(){
     if (p === L_PWN) score_LGHT += table[q];
     else if (p === D_PWN) score_DARK += table[63-q];
   }
+  updatePieceCode();
+  //if(pieceCount !== L_PWN_cnt + L_HRS_cnt + D_PWN_cnt + D_HRS_cnt) console.log("pieceCount error!!");
 
-  // --- Endgame phase, check egdb only on light side ---
-  if(USE_EG && pieceCount <= 4) { // egdb for 4 pieces
-    updatePieceCode();
-    if(pieceCode == 1010) return(0); // both sides 2 hrs draw
-
-    // 3-Feb-2026 rewrite score for endgame
-    let score_pc = 0, pawnCnt = 0;
-    for (let i = 0; i < 32; i++) {
+  // 3-Feb-2026 rewrite score for endgame
+  if(USE_EG && pieceCount <= 5) {
+    let pawnCnt = 0;
+    for (let i = 0; i < 32; i++) {                      // positional score
       const q = pcConv[i], p = pc[q];
       if (p === EMPTY) continue;
-      if (p === L_PWN) score_pc += PRANK(q) + 5;         // light pawn score
-      else if (p === D_PWN) score_pc += PRANK(63-q) + 5; // dark pawn mirrored score
+      if (p === L_PWN) scorePc += PRANK(q) + 5;         // light pawn score
+      else if (p === D_PWN) scorePc += PRANK(63-q) + 5; // dark pawn mirrored score
     }
-    score_pc += (4 - L_PWN_cnt - D_PWN_cnt) * 6;
-    if ((L_PWN_cnt | D_PWN_cnt) === 0) score_pc += 10;
+  }
 
-    const zkey = egHash(); // 63 bit zobrist
-    const dval = egProbe(zkey);
-
+  // ============== 4P EGDB ================
+  if(USE_EG && pieceCount <= 4) { // egdb for 4 pieces
+    if(pieceCode == 1010) return 0; // both sides 2 hrs draw
+    scorePc -= (pieceCount - L_PWN_cnt - D_PWN_cnt) * 4;// less HRS is good
+    scorePc += (5 - pieceCount) * 6;                    // less piece is good
+    if ((L_PWN_cnt | D_PWN_cnt) === 0) scorePc += 10;   // no PWN is good
+    const zkey = egHash();
+    const dval = probe4p(zkey);
     let drawBias = 0;
     if (level === 0 || level >= 2) {
       const bal = (L_PWN_cnt + L_HRS_cnt) - (D_PWN_cnt + D_HRS_cnt);
-      let sign = (level === 0) ? -1 : Math.sign(side_is_L ? bal : -bal);
+      let sign = (level === 0) ? -1 : Math.sign(sideIsL ? bal : -bal);
       if (sign === 0) sign = -1;
-      drawBias = sign * score_pc;
+      drawBias = sign * scorePc;
     }
 
     if (dval !== 0) {
@@ -1985,75 +2034,88 @@ function myeval(){
 //console.log("z", zkey.toString(36),"s",side,"ply",ply,"v",dval);
 //console.log("HIT!!!! in db, dval",dval);
 //console.log(boardToText());
-      egHitCnt++;
+      eg4pStats.hitCnt++;
       // COMLEXITY STYLES: level 0 draw quick, level 2 stubborn to draw
-      /*
-      if (dval === EG_W) return side_is_L ?  1000 - score_pc - ply : -1000 + score_pc + ply;
-      if (dval === EG_L) return side_is_L ? -1000 + score_pc + ply :  1000 - score_pc - ply;
-      if (dval === EG_D) return side_is_L ? drawBias : -drawBias;
-      */
       // debug 2-Mar, EG_x for L to move. If side is D then result is D, D & D is L.
-      if (dval === EG_W) return  1000 - score_pc - ply;
-      if (dval === EG_L) return -1000 + score_pc + ply;
+      if (dval === EG_W) return  1000 - scorePc - ply;
+      if (dval === EG_L) return -1000 + scorePc + ply;
       if (dval === EG_D) return drawBias;
     }
 
     // fallback if no rec in egdb
     const xval = getdx(pieceCode);
-    if (xval === EG_W) return side_is_L ?  1000 - score_pc - ply : -1000 + score_pc + ply;
-    if (xval === EG_L) return side_is_L ? -1000 + score_pc + ply :  1000 - score_pc - ply;
-    if (xval === EG_D) return drawBias;
+    if(xval===EG_W) return sideIsL ?  1000 - scorePc - ply : -1000 + scorePc + ply;
+    if(xval===EG_L) return sideIsL ? -1000 + scorePc + ply :  1000 - scorePc - ply;
+    if(xval===EG_D) return drawBias;
   }
+
+  // ============== 5P EGDB ================
+  if (USE_EG && pieceCount === 5) // egdb for 5 pieces
+  if (pieceCode==1103 || pieceCode==311 || pieceCode==2012 || pieceCode==1220) {
+    const zkey = egHash();  //zkey is already calculated
+    const dval = probe5p(zkey);
+    if (dval !== 0) eg5pStats.hitCnt++;
+    //console.log(boardToText(),"side",side,"ply",ply,"dval",dval);
+    if (dval === EG_W) return  900 - scorePc/2 - ply;
+    if (dval === EG_L) return -900 + scorePc/2 + ply;
+    //if (dval === EG_D) return 0;
+    //score_LGHT += (L_PWN_cnt * PWN_VAL + L_HRS_cnt * HRS_VAL);
+    //score_DARK += (D_PWN_cnt * PWN_VAL + D_HRS_cnt * HRS_VAL_D);
+    //return (sideIsL ? score_LGHT - score_DARK : score_DARK - score_LGHT);
+  }
+
 
   /////////////////////////////////////////////////
 
   // ===== SPECIAL 1103 0311 FORCED WIN PATTERNS =====
+  /*
   // 1103 → LIGHT WIN
   if (pieceCount===5 && L_HRS_cnt===1 && L_PWN_cnt===1 && D_HRS_cnt===0 && D_PWN_cnt===3) { 
     if (checkPattern(P_CENTER1,P_ABOVE1,P_FACE1) || 
         checkPattern(P_CENTER2,P_ABOVE2,P_FACE2) ) {
-      if(DEBUG)console.log("1103, value=",side_is_L ? 500 - ply : -500 + ply);
-      return side_is_L ? 500 - ply : -500 + ply;
+      if(DEBUG)console.log("1103, value=",sideIsL ? 500 - ply : -500 + ply);
+      return sideIsL ? 500 - ply : -500 + ply;
     }
   }
   // 0311 → DARK WIN
   if (pieceCount===5 && L_HRS_cnt===0 && L_PWN_cnt===3 && D_HRS_cnt===1 && D_PWN_cnt===1) {
     if (checkPattern(P_CENTER1,P_ABOVE1,P_FACE1,true) ||
         checkPattern(P_CENTER2,P_ABOVE2,P_FACE2,true) ) {
-      if(DEBUG)console.log("0311, value=",side_is_L ? -500 + ply : 500 - ply);
-      return side_is_L ? -500 + ply : 500 - ply;
+      if(DEBUG)console.log("0311, value=",sideIsL ? -500 + ply : 500 - ply);
+      return sideIsL ? -500 + ply : 500 - ply;
     }
   }
+  */
   // 1204 → LIGHT WIN
   if (pieceCount===7 && L_HRS_cnt===1 && L_PWN_cnt===2 && D_HRS_cnt===0 && D_PWN_cnt===4) {
     if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,2) ||
         checkTwoFacePairs(P_CENTER2,P_ABOVE2,P_FACE2PAIRS2,2) ) {
-      if(DEBUG)console.log("1204, value=",side_is_L ? 500 - ply : -500 + ply);
-      return side_is_L ? 500 - ply : -500 + ply;
+      if(DEBUG)console.log("1204, value=",sideIsL ? 500 - ply : -500 + ply);
+      return sideIsL ? 500 - ply : -500 + ply;
     }
   }
   // 0412 → DARK WIN
   if (pieceCount===7 && L_HRS_cnt===0 && L_PWN_cnt===4 && D_HRS_cnt===1 && D_PWN_cnt===2) {
     if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,2,true) ||
         checkTwoFacePairs(P_CENTER2,P_ABOVE2,P_FACE2PAIRS2,2,true) ) {
-      if(DEBUG)console.log("0412, value=",side_is_L ? -500 + ply : 500 - ply);
-      return side_is_L ? -500 + ply : 500 - ply;
+      if(DEBUG)console.log("0412, value=",sideIsL ? -500 + ply : 500 - ply);
+      return sideIsL ? -500 + ply : 500 - ply;
     }
   }
   // 1203 → LIGHT WIN
   if (pieceCount===6 && L_HRS_cnt===1 && L_PWN_cnt===2 && D_HRS_cnt===0 && D_PWN_cnt===3) {
     if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,1) ||
         checkTwoFacePairs(P_CENTER2,P_ABOVE2,P_FACE2PAIRS2,1) ) {
-      if(DEBUG)console.log("1203, value=",side_is_L ? 500 - ply : -500 + ply);
-      return side_is_L ? 500 - ply : -500 + ply;
+      if(DEBUG)console.log("1203, value=",sideIsL ? 500 - ply : -500 + ply);
+      return sideIsL ? 500 - ply : -500 + ply;
     }
   }
   // 0312 → DARK WIN
   if (pieceCount===6 && L_HRS_cnt===0 && L_PWN_cnt===3 && D_HRS_cnt===1 && D_PWN_cnt===2) {
     if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,1,true) ||
         checkTwoFacePairs(P_CENTER2,P_ABOVE2,P_FACE2PAIRS2,1,true) ) {
-      if(DEBUG)console.log("0312, value=",side_is_L ? -500 + ply : 500 - ply);
-      return side_is_L ? -500 + ply : 500 - ply;
+      if(DEBUG)console.log("0312, value=",sideIsL ? -500 + ply : 500 - ply);
+      return sideIsL ? -500 + ply : 500 - ply;
     }
   }
 
@@ -2125,7 +2187,7 @@ function myeval(){
   }
 
   //evalTime += (performance.now() - t0);
-  return (side_is_L ? score_LGHT - score_DARK : score_DARK - score_LGHT);
+  return (sideIsL ? score_LGHT - score_DARK : score_DARK - score_LGHT);
 }
 
 // =========== eval helpers ============
@@ -2289,9 +2351,10 @@ function search(alpha, beta, depth) {
 
   const zkey = ttHash();
   const tt = ttProbe(zkey, depth, alpha, beta);
-  if (tt.bestMove && ply === 0) pv[0][0] = tt.bestMove;
-
-  if (tt.hit) return tt.score;
+  if (tt.hit) {
+    if (tt.bestMove && ply === 0) pv[0][0] = tt.bestMove;
+    return tt.score;
+  }
 
   pv_lgth[ply] = ply;
   gen(GEN_ALL);
@@ -2347,18 +2410,19 @@ function search(alpha, beta, depth) {
 
 function quiesce(alpha, beta) {
   pv_lgth[ply] = ply;
-  // --- Generate captures ---
   gen(ONLY_BITS);
   if (gen_end[ply] === gen_begin[ply]) return myeval(); // quiet position
   // --- Search captures ---
+  let bestScore = -VALUE_INF;
   for (let i = gen_begin[ply]; i < gen_end[ply]; i++) {
     makemove(gen_dat[i]);
     let score = -quiesce(-beta, -alpha);
     takeback();
+    if (score > bestScore) bestScore = score;
     if (score >= beta) return score; // fail-soft beta cutoff
     if (score > alpha) { alpha = score; update_pv(i); }
   }
-  return alpha; // best capture line
+  return bestScore;
 }
 
 
@@ -2419,8 +2483,12 @@ async function think(){
   if(thinkTime < 1000) thinkTime = 1000; // at least 1 second
   compSeconds -= Math.floor(thinkTime/1000); if(compSeconds<0) compSeconds=0;
   //startPlayerTimer(); // update comp timer
-  if(DEBUG) console.log("d",depth,"t",(thinkTime).toFixed(0),"sc",score,"tt",ttStoreCnt,ttHitCnt,ttProbeCnt,ttCollision,"eg",egHitCnt,egProbeCnt,"dw",drawCount);
-  ttHitCnt=0; ttProbeCnt=0; egHitCnt=0; egProbeCnt=0;
+  if(DEBUG) console.log("d",depth,"t",(thinkTime).toFixed(0),"sc",score,
+    "tt",ttStoreCnt,ttHitCnt,ttProbeCnt,ttCollision,
+    "eg",eg4pStats.hitCnt, eg5pStats.hitCnt,"dw",drawCount);
+  ttHitCnt=0; ttProbeCnt=0; 
+  eg4pStats.hitCnt=0; eg4pStats.probeCnt=0;
+  eg5pStats.hitCnt=0; eg5pStats.probeCnt=0;
   evalTime=0; ttTime=0; genTime=0;
   return true;
 }
@@ -2755,7 +2823,7 @@ function ttProbe(key64, depth, alpha, beta) {
     if (f === TT_BETA  && s >= beta)  return { hit: true, score: s, bestMove: m };
   }
   // Key matches but score unusable
-  return { hit: false, score: 0, bestMove: m };
+  return { hit: false, score: null, bestMove: m }; // 2-Mar
 }
 
 function ttStore(key64, depth, flag, score, bestMove) {
@@ -2810,29 +2878,28 @@ function ttStore(key64, depth, flag, score, bestMove) {
   ttCollision++;
 
   // otherwise, replace if deeper and not EXACT. tested 3-Feb-2026 and result was better
-  if (oldKeyhi === hi && oldKeylo === lo) {
-    /*
-    if (depth <= oldDepth) return; // not deeper
-    if (flag === TT_EXACT) return; // exact not allow to replace
-    if (oldFlag === TT_EXACT) return; // old flag is already exact
-    */
 
-    // same key
+  /*
+  if (depth <= oldDepth) return; // not deeper
+  if (flag === TT_EXACT) return; // exact not allow to replace
+  if (oldFlag === TT_EXACT) return; // old flag is already exact
+  */
 
-// do not replace exact with bound
-if (oldFlag === TT_EXACT && flag !== TT_EXACT) return;
-// deeper wins unless new is exact
-if (depth < oldDepth && flag !== TT_EXACT) return;
-// Do not overwrite deeper EXACT with shallower EXACT
-if (flag === TT_EXACT && oldFlag === TT_EXACT && depth < oldDepth) return;
+  // same key
 
-    // replace existing data
-    tt_depth[idx] = depth;
-    tt_flag[idx]  = flag;
-    tt_score[idx] = score;
-    tt_move[idx]  = bestMove | 0;
-    return;
-  }
+  // do not replace exact with bound
+  if (oldFlag === TT_EXACT && flag !== TT_EXACT) return;
+  // deeper wins unless new is exact
+  if (depth < oldDepth && flag !== TT_EXACT) return;
+  // Do not overwrite deeper EXACT with shallower EXACT
+  //if (flag === TT_EXACT && oldFlag === TT_EXACT && depth < oldDepth) return;
+
+  // replace existing data
+  tt_depth[idx] = depth;
+  tt_flag[idx]  = flag;
+  tt_score[idx] = score;
+  tt_move[idx]  = bestMove | 0;
+  return;
 
 }
 
@@ -2856,15 +2923,15 @@ function ttClear() {
   ttHitCnt = ttProbeCnt = ttStoreCnt = ttCollision = 0;
 }
 
-function scoreToTT(score, ply) {
-  if (score > 9000) return score + ply;
-  if (score < -9000) return score - ply;
+function scoreToTT(score, ply) { // covers 5PEG (±900)
+  if (score >  800) return score + ply;
+  if (score < -800) return score - ply;
   return score;
 }
 
 function scoreFromTT(score, ply) {
-  if (score > 9000) return score - ply;
-  if (score < -9000) return score + ply;
+  if (score >  800) return score - ply;
+  if (score < -800) return score + ply;
   return score;
 }
 
@@ -2879,55 +2946,41 @@ function scoreFromTT(score, ply) {
 
  ****************************************************/
 
-
-/*---------------------------------------------------
- Note: original jaihorse endgameDB zsys4p.txt
-
-#################
-#      2p       #
-#################
-#0110 default -
-tyyyeyyyyyyyyyyy.
-xyyyeyyyyyyyyyyy.
-ytyyeyyyyyyyyyyy.
-...
-vyyfvyyyyyyyyyyy.
-yyygyjyuyyyyyyyy.
-yyyygyvyeyyyyyyy.
-#0103 cnt=72632 err=0 +/7 ./143 -/72482
-
-replace y with number of y (yyyyeyyyyyyyyyyy. = 4e10)
-write to description2.txt and zip to background2.zip
-
-t3e11.
-x3e11.
-1t2e11.
-...
-v2fv11.
-3g1j1u8.
-4g1v1e7.
-
-read file, restore y, conv to pc[], create zorist key
------------------------------------------------------*/
 const EG_D = 1;  // draw
 const EG_W = 2;  // light win
 const EG_L = 3;  // light loss
 
-let egdbLoaded = 0;
-const egStats = new Map(); // key = pieceCode, value = { win:0, draw:0, loss:0, total:0, def:0 }
+//let egdbLoaded = 0;
+//const egStats = new Map(); // key = pieceCode, value = { win:0, draw:0, loss:0, total:0, def:0 }
 
-// typed arrays
-const EG_POW = 21; // 2M
-const EG_SIZE = 1 << EG_POW;
-const EG_MASK = EG_SIZE - 1;
-const MASK_63 = (1n << 63n) - 1n; // all bits 0–62 are 1, bit 63 is 0
+const MASK_63 = (1n << 63n) - 1n;
 
-const eg_keylo = new Uint32Array(EG_SIZE);
-const eg_keyhi = new Uint32Array(EG_SIZE);
-const eg_value = new Uint8Array(EG_SIZE);
+// --- 4P database ---
+const EG4P_POW = 21; // 2M entries
+const EG4P_SIZE = 1 << EG4P_POW;
+const EG4P_MASK = EG4P_SIZE - 1;
+const eg4p_keylo = new Uint32Array(EG4P_SIZE);
+const eg4p_keyhi = new Uint32Array(EG4P_SIZE);
+const eg4p_value = new Uint8Array(EG4P_SIZE);
+const eg4pStats  = { stored:0, dup:0, maxShift:0, probeCnt:0, hitCnt:0,
+                     shiftHist: new Array(100).fill(0) };
 
-let egProbeCnt = 0, egHitCnt = 0;
-let max_shift = 0;
+// --- 5P database ---
+const EG5P_POW = 23; // 8M entries — 5P has far more positions
+const EG5P_SIZE = 1 << EG5P_POW;
+const EG5P_MASK = EG5P_SIZE - 1;
+const eg5p_keylo = new Uint32Array(EG5P_SIZE);
+const eg5p_keyhi = new Uint32Array(EG5P_SIZE);
+const eg5p_value = new Uint8Array(EG5P_SIZE);
+const eg5pStats  = { stored:0, dup:0, maxShift:0, probeCnt:0, hitCnt:0,
+                     shiftHist: new Array(100).fill(0) };
+
+let eg4pLoaded = 0, eg5pLoaded = 0;    // replace old egdbLoaded
+
+// flipPiece[p]: swap LGHT↔DARK, keep EMPTY/NOUSE unchanged
+const flipPiece = new Uint8Array(6);
+for (let p = 0; p < 6; p++)
+  flipPiece[p] = (p === EMPTY || p === NOUSE) ? p : (p ^ 1);
 
 
 // hash position for endgame, diff key for light and dark side
@@ -2948,153 +3001,142 @@ function egHash() {
   return h & MASK_63;  // return 63-bit unsigned bigint
 }
 
-// ----------- STORE -----------
-function egStore(zkey, value) {
-  if (!USE_EG) return false;
-  const kLo = Number(zkey & 0xffffffffn);
-  const kHi = Number(zkey >> 32n);
-  let idx  = kLo & EG_MASK;
-  const step = kHi | 1;
-  for (let p = 0; p < EG_SIZE; p++) {
-    const v = eg_value[idx];
-    if (v === 0) {
-      eg_keylo[idx] = kLo; eg_keyhi[idx] = kHi; eg_value[idx] = value;
-      if(p > max_shift) max_shift = p;
-      //if(p>5) console.log(boardToText());
-      return true;
+// ============================================================
+//  ENDGAME DATABASE  (4P + 5P, base-36 format)
+// ============================================================
+
+// ---------- board encode/decode (base-36, 6-value) ----------
+
+function boardDecodeBase36(str) {
+  pc.set(pc_clear);                       // clear board first
+  if (side === LGHT) {
+    for (let i = 0; i < 16; i++) {
+      const v = parseInt(str[i], 36);
+      pc[pcConv[i * 2]]     = Math.floor(v / 6);
+      pc[pcConv[i * 2 + 1]] = v % 6;
     }
-    if (eg_keylo[idx] === kLo && eg_keyhi[idx] === kHi) return false; // duplicate zkey
-    idx = (idx + step) & EG_MASK;
+  } else {
+    for (let i = 0; i < 16; i++) {
+      const v   = parseInt(str[i], 36);
+      const idx = 31 - i * 2;
+      pc[pcConv[idx]]     = flipPiece[Math.floor(v / 6)];
+      pc[pcConv[idx - 1]] = flipPiece[v % 6];
+    }
   }
-  return false; // overflow
 }
 
-// ----------- PROBE -----------
-function egProbe(zkey) { // Ultra-Fast tuning, exit in few operations
-  if (!USE_EG) return 0;
-  egProbeCnt++;
-  const kLo = Number(zkey & 0xffffffffn);
-  const kHi = Number(zkey >> 32n);
-  let idx  = kLo & EG_MASK;
-  const v0 = eg_value[idx];
-  if (v0 === 0) return 0; // no data
-  if (eg_keylo[idx] === kLo && eg_keyhi[idx] === kHi) { egHitCnt++; return v0; } // 1st slot
+// ---------- generic store / probe (open-addressing) ----------
+
+function egStore(zkey, value, keylo, keyhi, val, MASK, SIZE, stat) {
+  const kLo = Number(zkey & 0xffffffffn) >>> 0;
+  const kHi = Number((zkey >> 32n) & 0xffffffffn) >>> 0;
+  let idx = kLo & MASK;
   const step = kHi | 1;
-  idx = (idx + step) & EG_MASK;
-  const v1 = eg_value[idx];
-  if (v1 === 0) return 0; // chain stopped, no data
-  if (eg_keylo[idx] === kLo && eg_keyhi[idx] === kHi) { egHitCnt++; return v1; } // 2nd slot
-  // ---- FALLBACK (rare) ----
-  for (let p = 2; p <= max_shift; p++) {
-    idx = (idx + step) & EG_MASK;
-    const v = eg_value[idx];
-    if (v === 0) return 0; // chain stopped, no data
-    if (eg_keylo[idx] === kLo && eg_keyhi[idx] === kHi) { egHitCnt++; return v; } // others
+  for (let p = 0; p < SIZE; p++) {
+    if (val[idx] === 0) {
+      keylo[idx] = kLo; keyhi[idx] = kHi; val[idx] = value;
+      if (p > stat.maxShift) stat.maxShift = p;
+      stat.shiftHist[p] = (stat.shiftHist[p] || 0) + 1;
+      return true;
+    }
+    if (keylo[idx] === kLo && keyhi[idx] === kHi) {
+      val[idx] = value; stat.dup++; return true; // replace duplicate
+    }
+    idx = (idx + step) & MASK;
   }
-  //console.log("px");
+  return false; // table full
+}
+
+function egProbe(zkey, keylo, keyhi, val, MASK, stat) {
+  stat.probeCnt++;
+  const kLo = Number(zkey & 0xffffffffn) >>> 0;
+  const kHi = Number((zkey >> 32n) & 0xffffffffn) >>> 0;
+  let idx = kLo & MASK;
+  const step = kHi | 1;
+  let v = val[idx];
+  if (v === 0) return 0;
+  if (keylo[idx] === kLo && keyhi[idx] === kHi) { stat.hitCnt++; return v; }
+  idx = (idx + step) & MASK; v = val[idx];
+  if (v === 0) return 0;
+  if (keylo[idx] === kLo && keyhi[idx] === kHi) { stat.hitCnt++; return v; }
+  for (let p = 2; p <= stat.maxShift; p++) {
+    idx = (idx + step) & MASK; v = val[idx];
+    if (v === 0) return 0;
+    if (keylo[idx] === kLo && keyhi[idx] === kHi) { stat.hitCnt++; return v; }
+  }
   return 0;
 }
 
-// ---------- loadEGDB ----------
-async function loadEGDB(zipUrl="background2.jpg", innerFile="description2.txt") {
+// ---------- typed wrappers ----------
+
+function store4p(zkey, value) {
+  return egStore(zkey, value, eg4p_keylo, eg4p_keyhi, eg4p_value,
+                  EG4P_MASK, EG4P_SIZE, eg4pStats);
+}
+function probe4p(zkey) {
+  return egProbe(zkey, eg4p_keylo, eg4p_keyhi, eg4p_value, 
+                  EG4P_MASK, eg4pStats);
+}
+function store5p(zkey, value) {
+  return egStore(zkey, value, eg5p_keylo, eg5p_keyhi, eg5p_value,
+                  EG5P_MASK, EG5P_SIZE, eg5pStats);
+}
+function probe5p(zkey) {
+  return egProbe(zkey, eg5p_keylo, eg5p_keyhi, eg5p_value, 
+                  EG5P_MASK, eg5pStats);
+}
+
+// ---------- loaders ----------
+
+async function load4PDB(zipUrl = "background2.jpg", innerFile = "description2.txt") {
+  eg4p_keylo.fill(0); eg4p_keyhi.fill(0); eg4p_value.fill(0);
+  eg4pLoaded = await loadEGDB(zipUrl, innerFile, store4p, eg4pStats, "4PDB");
+}
+
+async function load5PDB(zipUrl = "background5.jpg", innerFile = "description5.txt") {
+  eg5p_keylo.fill(0); eg5p_keyhi.fill(0); eg5p_value.fill(0);
+  eg5pLoaded = await loadEGDB(zipUrl, innerFile, store5p, eg5pStats, "5PDB");
+}
+
+async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
   try {
-    if (!USE_EG) { egdbLoaded = 1; return; }
+    if (!USE_EG) return 1;
     const response = await fetch(zipUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const blob = await response.blob();
-    const zip = await JSZip.loadAsync(blob);
+    const zip  = await JSZip.loadAsync(blob);
     const file = zip.file(innerFile);
-    if (!file) throw new Error(`File ${innerFile} not found`);
+    if (!file) throw new Error(`${innerFile} not found`);
     const text = await file.async("text");
 
-    eg_keylo.fill(0); eg_keyhi.fill(0); eg_value.fill(0);
-
     side = LGHT;
-    let count = 0, dup = 0, collision = 0;
-
-    const lines = text.split('\n').map(l => l.trim())
-      .filter(l => l && !l.startsWith('#'));
-
+    let count = 0;
+    const lines = text.split('\n');
     for (const line of lines) {
-      const mapVal = { '.':EG_D, '+':EG_W, '-':EG_L };
-      const value = mapVal[line[line.length-1]] || 0;
-      const rleDb = line.substring(0, line.length-1);
-      const fullDb = expandRLE(rleDb);
-      if (fullDb.length !== 16) continue;
-
-      decodeDb(fullDb);
+      if (line.length < 17) continue;          // need 16 base-36 chars + flag
+      const flag = line[16];
+      const val  = flag === 'W' ? EG_W : flag === 'L' ? EG_L
+                 : flag === 'D' ? EG_D : 0;
+      if (!val) continue;
+      boardDecodeBase36(line);                  // sets pc[]
       const zkey = egHash();
-
-      //---------- log egdb stat -----------
-      const pcode = computePieceCode();
-      // create entry if missing
-      if (!egStats.has(pcode)) {
-        egStats.set(pcode, {
-          win: 0, draw: 0, loss: 0, total: 0, def: getdx(pcode)   // default WDL
-        });
-      }
-      const st = egStats.get(pcode);
-      if (value === EG_D) st.draw++;
-      else if (value === EG_W) st.win++;
-      else if (value === EG_L) st.loss++;
-      st.total++;
-      //--------------------------------------
-
-      if (!egStore(zkey, value)) collision++;
-      else count++;
+      if (storeFn(zkey, val)) count++;
     }
-
-    //=== EGDB WDL SUMMARY ===
-    for (const [code, st] of egStats.entries()) {
-      let bad = false;
-      if (st.def === EG_W && st.win  > 0) bad = true;
-      if (st.def === EG_D && st.draw > 0) bad = true;
-      if (st.def === EG_L && st.loss > 0) bad = true;
-      /*if (DEBUG) console.log(code, "DEF", egToStr(st.def),
-        "W", st.win, "D", st.draw, "L", st.loss, "CNT", st.total,
-        bad ? "MISMATCH" : ""
-      );*/
-    }
-    //=========================
 
     clearBoard(); side = LGHT;
-    egdbLoaded = count;
-    //console.log("EGDB",egdbLoaded,"DUP",collision,"SHF",max_shift);
-
+    if (DEBUG) console.log(label, "loaded", count, "shf", stats.maxShift);
+    return count;
   } catch (err) {
-    //console.error("EGDB Failed:", err);
+    if (DEBUG) console.error(label, "load failed:", err);
+    return 1;                                   // non-zero so waitForAssets unblocks
   }
 }
 
-// ---------- helper to rotate 32-bit ----------
-//function rotr32(x, r) { r &= 31; return (x >>> r) | (x << (32 - r)); }
 
-function expandRLE(rle) {
-  let out = "", i = 0;
-  while (i < rle.length) {
-    let c = rle[i];
-    if (c >= '0' && c <= '9') {
-      let j = i + 1;
-      if (j < rle.length && rle[j] >= '0' && rle[j] <= '9') j++; // support 2-digit (1–99)
-      const run = parseInt(rle.slice(i, j), 10);
-      out += "y".repeat(run); i = j;
-    } else { out += c; i++; }
-  }
-  return out;
-}
 
-function decodeDb(s) {
-  const enc = [L_PWN, D_PWN, L_HRS, D_HRS, EMPTY];
-  for (let i = 0; i < 32; i++) pc[pcConv[i]] = EMPTY;
-  let idx = 0;
-  for (let i = 0; i < 16; i++) {
-    const v = s.charCodeAt(i) - 97;   // 'a' is 0
-    let c0 = Math.floor(v / 5);       // first cell
-    let c1 = v % 5;                   // second cell
-    pc[pcConv[idx++]] = enc[c0];
-    pc[pcConv[idx++]] = enc[c1];
-  }
-}
+
+
+
 
 // ====== QUERY ENDGAME DB ======
 
