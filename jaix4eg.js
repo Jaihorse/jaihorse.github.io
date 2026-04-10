@@ -38,7 +38,7 @@ Zobrist key is 64 bits to avoid key duplication.
 "use strict";
 
 const CODE_VERSION = "x4eg";
-const CODE_DATE = "EG0331";
+const CODE_DATE = "EG0410";
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
@@ -81,15 +81,30 @@ const pc_init_debug = pc_init;
 
 /*/
 
+const brd_init_debug =
+[
+  " . . . .",
+  ". . x o ",
+  " . . . x",
+  "x . . . ",
+  " . o . o",
+  "x . o . ",
+  " . o . .",
+  ". . . . ",
+]
+const pc_init_debug = textToBoard(brd_init_debug);
+
+//
+
 const pc_init_debug = new Int32Array([  // 6p
   5, 4, 5, 4, 5, 4, 5, 4,
-  4, 5, 3, 5, 4, 5, 4, 5,
-  5, 4, 5, 4, 5, 4, 5, 3,
-  1, 5, 4, 5, 4, 5, 4, 5,
-  5, 4, 5, 4, 5, 4, 5, 4,
-  0, 5, 4, 5, 4, 5, 4, 5,
-  5, 4, 5, 4, 5, 2, 5, 4,
-  4, 5, 0, 5, 0, 5, 4, 5
+  4, 5, 0, 5, 4, 5, 4, 5,
+  5, 1, 5, 4, 5, 4, 5, 1,
+  4, 5, 1, 5, 4, 5, 4, 5,
+  5, 4, 5, 4, 5, 0, 5, 4,
+  0, 5, 4, 5, 0, 5, 4, 5,
+  5, 4, 5, 4, 5, 4, 5, 1,
+  4, 5, 4, 5, 4, 5, 4, 5
 ]);
 
 //
@@ -260,8 +275,8 @@ let pv = new Array(HIST_STACK), pv_lgth = new Array(HIST_STACK);
  *************************************************/
 
 function init(){ 
-  initArrays(); loadImages(); loadBKDB(); 
-  load4PDB(); load5PDB(); waitForAssets();
+  initArrays(); loadImages(); loadBKDB(); waitForAssets();
+  loadAllEGDB(); //waitForEGDB();
 }
 
 function initArrays() {
@@ -274,8 +289,9 @@ function initArrays() {
 }
 
 function waitForAssets() {
-  if (!imagesLoaded || eg4pLoaded === 0 || eg5pLoaded === 0 || bkdbLoaded === 0) {
-    setTimeout(waitForAssets, 200); return; 
+  //if (!imagesLoaded || bkdbLoaded === 0 || eg4pLoaded === 0 || eg5pLoaded === 0) {
+  if (!imagesLoaded || bkdbLoaded === 0) {  // 8-Apr: load egdb in background
+    setTimeout(waitForAssets, 100); return; 
   }
   const s = "level=" + CODE_DATE + "&result=" + eg4pLoaded + "-" + eg5pLoaded
             + "&moves=" + bkdbLoaded;
@@ -817,6 +833,25 @@ function showStyleIconIcon(show) {
   soundElm.style.display = show ? "inline" : "none"; 
 }
 
+function textToBoard(brd) {
+  const out = new Array(64).fill(NOUSE);
+  for (let r = 0; r < 8; r++) {
+    let c = 0;
+    for (const ch of brd[r]) {
+      //if (ch === ' ') continue; // ignore ALL spaces
+      const sq = r * 8 + c;
+      out[sq] =
+        ch === 'o' ? L_PWN :
+        ch === 'x' ? D_PWN :
+        ch === '@' ? L_HRS :
+        ch === '#' ? D_HRS :
+        ch === '.' ? EMPTY : NOUSE;
+      c++;
+      if (c >= 8) break; // stop once row is filled
+    }
+  }
+  return out;
+}
 
 /********* ANIMATE HAND AND PIECE MOVE **************
  
@@ -2003,7 +2038,8 @@ function myeval(){
   //if(pieceCount !== L_PWN_cnt + L_HRS_cnt + D_PWN_cnt + D_HRS_cnt) console.log("pieceCount error!!");
 
   // 3-Feb-2026 rewrite score for endgame
-  if(USE_EG && pieceCount <= 5) {
+  //if(USE_EG && egdbReady && pieceCount <= 5) {
+  if(USE_EG && pieceCount <= 8) {
     let pawnCnt = 0;
     for (let i = 0; i < 32; i++) {                      // positional score
       const q = pcConv[i], p = pc[q];
@@ -2014,7 +2050,8 @@ function myeval(){
   }
 
   // ============== 4P EGDB ================
-  if(USE_EG && pieceCount <= 4) { // egdb for 4 pieces
+  if(USE_EG && pieceCount<=4 && eg4pReady) { // egdb for 4 pieces
+  //if(USE_EG && pieceCount <= 4) { // egdb for 4 pieces
     if(pieceCode == 1010) return 0; // both sides 2 hrs draw
     scorePc -= (pieceCount - L_PWN_cnt - D_PWN_cnt) * 4;// less HRS is good
     scorePc += (5 - pieceCount) * 6;                    // less piece is good
@@ -2034,7 +2071,7 @@ function myeval(){
 //console.log("z", zkey.toString(36),"s",side,"ply",ply,"v",dval);
 //console.log("HIT!!!! in db, dval",dval);
 //console.log(boardToText());
-      eg4pStats.hitCnt++;
+      if (DEBUG) eg4pStats.hitCnt++;
       // COMLEXITY STYLES: level 0 draw quick, level 2 stubborn to draw
       // debug 2-Mar, EG_x for L to move. If side is D then result is D, D & D is L.
       if (dval === EG_W) return  1000 - scorePc - ply;
@@ -2050,25 +2087,42 @@ function myeval(){
   }
 
   // ============== 5P EGDB ================
-  if (USE_EG && pieceCount === 5) // egdb for 5 pieces
-  if (pieceCode==1103 || pieceCode==311 || pieceCode==2012 || pieceCode==1220) {
-    const zkey = egHash();  //zkey is already calculated
+  if (USE_EG && pieceCount===5 && eg5pReady) // egdb for 5 pieces
+  if (pieceCode==1103 || pieceCode==311) {
+    const zkey = egHash(); 
     const dval = probe5p(zkey);
-    if (dval !== 0) eg5pStats.hitCnt++;
-    //console.log(boardToText(),"side",side,"ply",ply,"dval",dval);
-    if (dval === EG_W) return  900 - scorePc/2 - ply;
-    if (dval === EG_L) return -900 + scorePc/2 + ply;
-    //if (dval === EG_D) return 0;
-    //score_LGHT += (L_PWN_cnt * PWN_VAL + L_HRS_cnt * HRS_VAL);
-    //score_DARK += (D_PWN_cnt * PWN_VAL + D_HRS_cnt * HRS_VAL_D);
-    //return (sideIsL ? score_LGHT - score_DARK : score_DARK - score_LGHT);
+    if (DEBUG) { eg5pStats.probeCnt++; if (dval !== 0) eg5pStats.hitCnt++; }
+    if (dval === EG_W) return  900 - scorePc - ply;
+    if (dval === EG_L) return -900 + scorePc + ply;
+  }
+
+  // ============== 6P EGDB ================
+  if (USE_EG && pieceCount===6 && eg6pReady) // egdb for 6 pieces
+  if (pieceCode==303) {
+    const zkey = egHash(); 
+    const dval = probe6p(zkey);
+    if (DEBUG) { eg6pStats.probeCnt++; if (dval !== 0) eg6pStats.hitCnt++; }
+    if (dval === EG_W) return  800 - scorePc - ply;
+    if (dval === EG_L) return -800 + scorePc + ply;
+  }
+
+  // ============== 7P EGDB ================
+  if (USE_EG && pieceCount===7 && eg7pReady) // egdb for 7 pieces
+  if (pieceCode==1204 || pieceCode==412) {
+    const zkey = egHash();  
+    const dval = probe7p(zkey); 
+    if (DEBUG) { eg7pStats.probeCnt++; if (dval !== 0) eg7pStats.hitCnt++; }
+    if (dval === EG_W) return  700 - scorePc - ply;
+    if (dval === EG_L) return -700 + scorePc + ply;
   }
 
 
   /////////////////////////////////////////////////
 
+  /* disable, 3-Apr
+
   // ===== SPECIAL 1103 0311 FORCED WIN PATTERNS =====
-  /*
+  
   // 1103 → LIGHT WIN
   if (pieceCount===5 && L_HRS_cnt===1 && L_PWN_cnt===1 && D_HRS_cnt===0 && D_PWN_cnt===3) { 
     if (checkPattern(P_CENTER1,P_ABOVE1,P_FACE1) || 
@@ -2085,7 +2139,7 @@ function myeval(){
       return sideIsL ? -500 + ply : 500 - ply;
     }
   }
-  */
+  
   // 1204 → LIGHT WIN
   if (pieceCount===7 && L_HRS_cnt===1 && L_PWN_cnt===2 && D_HRS_cnt===0 && D_PWN_cnt===4) {
     if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,2) ||
@@ -2118,6 +2172,7 @@ function myeval(){
       return sideIsL ? -500 + ply : 500 - ply;
     }
   }
+  */
 
   /////////////////////////////////////////////////
 
@@ -2485,10 +2540,14 @@ async function think(){
   //startPlayerTimer(); // update comp timer
   if(DEBUG) console.log("d",depth,"t",(thinkTime).toFixed(0),"sc",score,
     "tt",ttStoreCnt,ttHitCnt,ttProbeCnt,ttCollision,
-    "eg",eg4pStats.hitCnt, eg5pStats.hitCnt,"dw",drawCount);
+    "ep",eg4pStats.probeCnt,eg5pStats.probeCnt,eg6pStats.probeCnt,eg7pStats.probeCnt,
+    "eh",eg4pStats.hitCnt,  eg5pStats.hitCnt,  eg6pStats.hitCnt,  eg7pStats.hitCnt,
+    "dw",drawCount);
   ttHitCnt=0; ttProbeCnt=0; 
   eg4pStats.hitCnt=0; eg4pStats.probeCnt=0;
   eg5pStats.hitCnt=0; eg5pStats.probeCnt=0;
+  eg6pStats.hitCnt=0; eg6pStats.probeCnt=0;
+  eg7pStats.hitCnt=0; eg7pStats.probeCnt=0;
   evalTime=0; ttTime=0; genTime=0;
   return true;
 }
@@ -2955,8 +3014,7 @@ const EG_L = 3;  // light loss
 
 const MASK_63 = (1n << 63n) - 1n;
 
-// --- 4P database ---
-const EG4P_POW = 21; // 2M entries
+const EG4P_POW = 20; // 1M entries
 const EG4P_SIZE = 1 << EG4P_POW;
 const EG4P_MASK = EG4P_SIZE - 1;
 const eg4p_keylo = new Uint32Array(EG4P_SIZE);
@@ -2965,8 +3023,7 @@ const eg4p_value = new Uint8Array(EG4P_SIZE);
 const eg4pStats  = { stored:0, dup:0, maxShift:0, probeCnt:0, hitCnt:0,
                      shiftHist: new Array(100).fill(0) };
 
-// --- 5P database ---
-const EG5P_POW = 23; // 8M entries — 5P has far more positions
+const EG5P_POW = 21; // 2M entries — 5P has far more positions
 const EG5P_SIZE = 1 << EG5P_POW;
 const EG5P_MASK = EG5P_SIZE - 1;
 const eg5p_keylo = new Uint32Array(EG5P_SIZE);
@@ -2975,7 +3032,29 @@ const eg5p_value = new Uint8Array(EG5P_SIZE);
 const eg5pStats  = { stored:0, dup:0, maxShift:0, probeCnt:0, hitCnt:0,
                      shiftHist: new Array(100).fill(0) };
 
-let eg4pLoaded = 0, eg5pLoaded = 0;    // replace old egdbLoaded
+const EG6P_POW = 20; // 1M entries — 5P has far more positions
+const EG6P_SIZE = 1 << EG6P_POW;
+const EG6P_MASK = EG6P_SIZE - 1;
+const eg6p_keylo = new Uint32Array(EG6P_SIZE);
+const eg6p_keyhi = new Uint32Array(EG6P_SIZE);
+const eg6p_value = new Uint8Array(EG6P_SIZE);
+const eg6pStats  = { stored:0, dup:0, maxShift:0, probeCnt:0, hitCnt:0,
+                     shiftHist: new Array(100).fill(0) };
+
+const EG7P_POW = 22; // 4M entries — 5P has far more positions
+const EG7P_SIZE = 1 << EG7P_POW;
+const EG7P_MASK = EG7P_SIZE - 1;
+const eg7p_keylo = new Uint32Array(EG7P_SIZE);
+const eg7p_keyhi = new Uint32Array(EG7P_SIZE);
+const eg7p_value = new Uint8Array(EG7P_SIZE);
+const eg7pStats  = { stored:0, dup:0, maxShift:0, probeCnt:0, hitCnt:0,
+                     shiftHist: new Array(100).fill(0) };
+
+let eg4pLoaded = 0, eg5pLoaded = 0, eg6pLoaded = 0, eg7pLoaded = 0;
+let eg4pReady = false, eg5pReady = false, 
+    eg6pReady = false, eg7pReady = false, egdbReady = false;
+
+const egpc = new Int32Array(pc_clear);
 
 // flipPiece[p]: swap LGHT↔DARK, keep EMPTY/NOUSE unchanged
 const flipPiece = new Uint8Array(6);
@@ -2983,17 +3062,29 @@ for (let p = 0; p < 6; p++)
   flipPiece[p] = (p === EMPTY || p === NOUSE) ? p : (p ^ 1);
 
 
+async function loadAllEGDB() {
+  await load4PDB(); await holdMs();
+  await load5PDB(); await holdMs();
+  await load6PDB(); await holdMs();
+  await load7PDB(); await holdMs();
+  //egdbReady = true;
+}
+
+function waitForEGDB() {
+  if(!egdbReady) { setTimeout(waitForEGDB, 500); return; }
+}
+
 // hash position for endgame, diff key for light and dark side
-function egHash() {
+function egHash(board = pc, isLght = (side === LGHT)) {
   if (!USE_EG) return 0n;
-  const isLght = (side === LGHT);
+  //const isLght = (side === LGHT);
   const zp = zobrist_piece;
   const conv = isLght ? pcConv : pcFlip;
   let h = 0n;
   for (let i = 0; i < 32; i++) {
     const sq = conv[i]; //pcConv[i];
     const zpSq = zp[i];
-    let p = pc[sq];
+    let p = board[sq];
     if(p >= 4 || p < 0) continue; // p is not pieces or empty
     if (!isLght && p !== EMPTY) p ^= 1; // flip piece if dark
     h ^= zpSq[p];
@@ -3007,20 +3098,20 @@ function egHash() {
 
 // ---------- board encode/decode (base-36, 6-value) ----------
 
-function boardDecodeBase36(str) {
-  pc.set(pc_clear);                       // clear board first
-  if (side === LGHT) {
+function boardDecodeBase36(str, isLght = (side === LGHT)) {
+  egpc.set(pc_clear);                       // clear board first
+  if (isLght) {
     for (let i = 0; i < 16; i++) {
       const v = parseInt(str[i], 36);
-      pc[pcConv[i * 2]]     = Math.floor(v / 6);
-      pc[pcConv[i * 2 + 1]] = v % 6;
+      egpc[pcConv[i * 2]]     = Math.floor(v / 6);
+      egpc[pcConv[i * 2 + 1]] = v % 6;
     }
   } else {
     for (let i = 0; i < 16; i++) {
       const v   = parseInt(str[i], 36);
       const idx = 31 - i * 2;
-      pc[pcConv[idx]]     = flipPiece[Math.floor(v / 6)];
-      pc[pcConv[idx - 1]] = flipPiece[v % 6];
+      egpc[pcConv[idx]]     = flipPiece[Math.floor(v / 6)];
+      egpc[pcConv[idx - 1]] = flipPiece[v % 6];
     }
   }
 }
@@ -3085,54 +3176,90 @@ function probe5p(zkey) {
   return egProbe(zkey, eg5p_keylo, eg5p_keyhi, eg5p_value, 
                   EG5P_MASK, eg5pStats);
 }
+function store6p(zkey, value) {
+  return egStore(zkey, value, eg6p_keylo, eg6p_keyhi, eg6p_value,
+                  EG6P_MASK, EG6P_SIZE, eg6pStats);
+}
+function probe6p(zkey) {
+  return egProbe(zkey, eg6p_keylo, eg6p_keyhi, eg6p_value, 
+                  EG6P_MASK, eg6pStats);
+}
+function store7p(zkey, value) {
+  return egStore(zkey, value, eg7p_keylo, eg7p_keyhi, eg7p_value,
+                  EG7P_MASK, EG5P_SIZE, eg7pStats);
+}
+function probe7p(zkey) {
+  return egProbe(zkey, eg7p_keylo, eg7p_keyhi, eg7p_value, 
+                  EG7P_MASK, eg7pStats);
+}
 
 // ---------- loaders ----------
 
 async function load4PDB(zipUrl = "background2.jpg", innerFile = "description2.txt") {
   eg4p_keylo.fill(0); eg4p_keyhi.fill(0); eg4p_value.fill(0);
   eg4pLoaded = await loadEGDB(zipUrl, innerFile, store4p, eg4pStats, "4PDB");
+  eg4pReady = true;
 }
-
 async function load5PDB(zipUrl = "background5.jpg", innerFile = "description5.txt") {
   eg5p_keylo.fill(0); eg5p_keyhi.fill(0); eg5p_value.fill(0);
   eg5pLoaded = await loadEGDB(zipUrl, innerFile, store5p, eg5pStats, "5PDB");
+  eg5pReady = true;
+}
+async function load6PDB(zipUrl = "background6.jpg", innerFile = "description6.txt") {
+  eg6p_keylo.fill(0); eg6p_keyhi.fill(0); eg6p_value.fill(0);
+  eg6pLoaded = await loadEGDB(zipUrl, innerFile, store6p, eg6pStats, "6PDB");
+  eg6pReady = true;
+}
+async function load7PDB(zipUrl = "background7.jpg", innerFile = "description7.txt") {
+  eg7p_keylo.fill(0); eg7p_keyhi.fill(0); eg7p_value.fill(0);
+  eg7pLoaded = await loadEGDB(zipUrl, innerFile, store7p, eg7pStats, "7PDB");
+  eg7pReady = true;
 }
 
 async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
   try {
     if (!USE_EG) return 1;
     const response = await fetch(zipUrl);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const blob = await response.blob();
     const zip  = await JSZip.loadAsync(blob);
     const file = zip.file(innerFile);
     if (!file) throw new Error(`${innerFile} not found`);
-    const text = await file.async("text");
-
-    side = LGHT;
+    const text = await file.async("text"); // still blocking, freeze briefly
+    //side = LGHT;
     let count = 0;
     const lines = text.split('\n');
-    for (const line of lines) {
-      if (line.length < 17) continue;          // need 16 base-36 chars + flag
-      const flag = line[16];
-      const val  = flag === 'W' ? EG_W : flag === 'L' ? EG_L
-                 : flag === 'D' ? EG_D : 0;
-      if (!val) continue;
-      boardDecodeBase36(line);                  // sets pc[]
-      const zkey = egHash();
-      if (storeFn(zkey, val)) count++;
+    const CHUNK = 10000;
+    for (let i = 0; i < lines.length; i += CHUNK) {
+      while (bCompBusy) await holdMs(100); // pause if engine thinking
+      const end = Math.min(i + CHUNK, lines.length);
+      for (let j = i; j < end; j++) {
+        const line = lines[j];
+        if (line.length < 17) continue;
+        const flag = line[16];
+        const val  = flag==='W' ? EG_W : flag==='L' ? EG_L : flag==='D' ? EG_D : 0;
+        if (!val) continue;
+        boardDecodeBase36(line,true);
+        const zkey = egHash(egpc,true);
+        if (storeFn(zkey, val)) count++;
+      }
+      await yieldUI();
     }
-
-    clearBoard(); side = LGHT;
+    //clearBoard();
+    //side = LGHT;
     if (DEBUG) console.log(label, "loaded", count, "shf", stats.maxShift);
     return count;
   } catch (err) {
     if (DEBUG) console.error(label, "load failed:", err);
-    return 1;                                   // non-zero so waitForAssets unblocks
+    return 1;
   }
 }
 
-
+function yieldUI() {
+  if (window.requestIdleCallback) {
+    return new Promise(resolve => requestIdleCallback(resolve));
+  }
+  return hold(0);
+}
 
 
 
