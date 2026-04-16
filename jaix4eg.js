@@ -38,10 +38,11 @@ Zobrist key is 64 bits to avoid key duplication.
 "use strict";
 
 const CODE_VERSION = "x4eg";
-const CODE_DATE = "EG0410";
+const CODE_DATE = "EG0416";
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
+const LOGSCORE = false;
 const USE_BK = true;
 const USE_TT = true;
 const USE_EG = true;
@@ -2524,7 +2525,7 @@ async function think(){
     follow_pv = true; score = search(MINALPHA, MAXBETA, depth);
     curBestMove = pv[0][0], curBestScore = score;
 //console.log(FM(prvBestMove), FM(pv[0][0]));
-    if(DEBUG)console.log(depth,score,cellToNum[FM(pv[0][0])],cellToNum[TO(pv[0][0])]);
+    if(LOGSCORE)console.log(depth,score,cellToNum[FM(pv[0][0])],cellToNum[TO(pv[0][0])]);
     elapsed = performance.now() - t0;
     if(elapsed >= MAX_THINK_MS) break; // time limit
     if(depth >= targetDepth && score < -9986) return false; // mate loss 9988
@@ -2538,7 +2539,7 @@ async function think(){
   if(thinkTime < 1000) thinkTime = 1000; // at least 1 second
   compSeconds -= Math.floor(thinkTime/1000); if(compSeconds<0) compSeconds=0;
   //startPlayerTimer(); // update comp timer
-  if(DEBUG) console.log("d",depth,"t",(thinkTime).toFixed(0),"sc",score,
+  if(LOGSCORE) console.log("d",depth,"t",(thinkTime).toFixed(0),"sc",score,
     "tt",ttStoreCnt,ttHitCnt,ttProbeCnt,ttCollision,
     "ep",eg4pStats.probeCnt,eg5pStats.probeCnt,eg6pStats.probeCnt,eg7pStats.probeCnt,
     "eh",eg4pStats.hitCnt,  eg5pStats.hitCnt,  eg6pStats.hitCnt,  eg7pStats.hitCnt,
@@ -3014,7 +3015,7 @@ const EG_L = 3;  // light loss
 
 const MASK_63 = (1n << 63n) - 1n;
 
-const EG4P_POW = 20; // 1M entries
+const EG4P_POW = 20; // 1M slots for 500k
 const EG4P_SIZE = 1 << EG4P_POW;
 const EG4P_MASK = EG4P_SIZE - 1;
 const eg4p_keylo = new Uint32Array(EG4P_SIZE);
@@ -3023,7 +3024,7 @@ const eg4p_value = new Uint8Array(EG4P_SIZE);
 const eg4pStats  = { stored:0, dup:0, maxShift:0, probeCnt:0, hitCnt:0,
                      shiftHist: new Array(100).fill(0) };
 
-const EG5P_POW = 21; // 2M entries — 5P has far more positions
+const EG5P_POW = 21; // 2M slots for 750k
 const EG5P_SIZE = 1 << EG5P_POW;
 const EG5P_MASK = EG5P_SIZE - 1;
 const eg5p_keylo = new Uint32Array(EG5P_SIZE);
@@ -3032,7 +3033,7 @@ const eg5p_value = new Uint8Array(EG5P_SIZE);
 const eg5pStats  = { stored:0, dup:0, maxShift:0, probeCnt:0, hitCnt:0,
                      shiftHist: new Array(100).fill(0) };
 
-const EG6P_POW = 20; // 1M entries — 5P has far more positions
+const EG6P_POW = 20; // 1M slots for 350k
 const EG6P_SIZE = 1 << EG6P_POW;
 const EG6P_MASK = EG6P_SIZE - 1;
 const eg6p_keylo = new Uint32Array(EG6P_SIZE);
@@ -3041,7 +3042,7 @@ const eg6p_value = new Uint8Array(EG6P_SIZE);
 const eg6pStats  = { stored:0, dup:0, maxShift:0, probeCnt:0, hitCnt:0,
                      shiftHist: new Array(100).fill(0) };
 
-const EG7P_POW = 22; // 4M entries — 5P has far more positions
+const EG7P_POW = 21; // 2M slots for 600k
 const EG7P_SIZE = 1 << EG7P_POW;
 const EG7P_MASK = EG7P_SIZE - 1;
 const eg7p_keylo = new Uint32Array(EG7P_SIZE);
@@ -3200,17 +3201,17 @@ async function load4PDB(zipUrl = "background2.jpg", innerFile = "description2.tx
   eg4pLoaded = await loadEGDB(zipUrl, innerFile, store4p, eg4pStats, "4PDB");
   eg4pReady = true;
 }
-async function load5PDB(zipUrl = "background5.jpg", innerFile = "description5.txt") {
+async function load5PDB(zipUrl = "background5r.jpg", innerFile = "description5r.txt") {
   eg5p_keylo.fill(0); eg5p_keyhi.fill(0); eg5p_value.fill(0);
   eg5pLoaded = await loadEGDB(zipUrl, innerFile, store5p, eg5pStats, "5PDB");
   eg5pReady = true;
 }
-async function load6PDB(zipUrl = "background6.jpg", innerFile = "description6.txt") {
+async function load6PDB(zipUrl = "background6r.jpg", innerFile = "description6r.txt") {
   eg6p_keylo.fill(0); eg6p_keyhi.fill(0); eg6p_value.fill(0);
   eg6pLoaded = await loadEGDB(zipUrl, innerFile, store6p, eg6pStats, "6PDB");
   eg6pReady = true;
 }
-async function load7PDB(zipUrl = "background7.jpg", innerFile = "description7.txt") {
+async function load7PDB(zipUrl = "background7r.jpg", innerFile = "description7r.txt") {
   eg7p_keylo.fill(0); eg7p_keyhi.fill(0); eg7p_value.fill(0);
   eg7pLoaded = await loadEGDB(zipUrl, innerFile, store7p, eg7pStats, "7PDB");
   eg7pReady = true;
