@@ -64,8 +64,8 @@
     #newgame.disabled { opacity: 0.4; pointer-events: none; }
     #newgame:hover{ background:#ddd; color:#333; }
 
-    #styleSwitch, #styleComp, #soundSwitch, #soundIcon, 
-    #cellNumSwitch, #newgame, #qaLink img {
+    #styleSwitch, #styleComp, #soundSwitch, #soundIcon, #reloadSwitch, 
+    #cellNumSwitch, #qaLink img, #newgame {
       display:inline; height: 3.5vmin; 
       vertical-align: middle; margin-left: 1px;
       cursor: pointer; pointer-events: auto;
@@ -82,20 +82,6 @@
       pointer-events: none;
     }
     .overlay-text.show { opacity: 1; }
-
-    /*
-    #vignetteOuter{
-      z-index:4; position:absolute; inset:0; 
-      background: radial-gradient(
-        circle at center,
-        rgba(0,0,0,0) 40%,
-        rgba(0,0,0,0.1) 75%,
-        rgba(0,0,0,0.2) 85%,
-        rgba(0,0,0,0.3) 100% 
-      );
-      pointer-events:none;
-    }
-    */
 
     #qaLink{text-decoration:none;cursor:pointer;font-weight:bold;color:#ddd}
     #qa{
@@ -171,6 +157,7 @@
         <!--img id="styleSwitch" /-->
         <span id="cellNumSwitch">123</span>
         <img id="soundSwitch" src="speaker0.png" />
+        <img id="reloadSwitch" src="reload.png" />
       </span>
     </div>
 
@@ -179,6 +166,7 @@
     <!--div><span id="footer">&nbsp;</span></div-->
   </div>
 
+  <!--script src="WindowResize4dw.js?t=0503>"></script-->
   <script src="WindowResize4dw.js?t=0503>"></script>
   <!--script>
     // Resize handler to ensure board stays centered even in frame
