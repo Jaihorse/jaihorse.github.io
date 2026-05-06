@@ -38,7 +38,7 @@ Zobrist key is 64 bits to avoid key duplication.
 "use strict";
 
 const CODE_VERSION = "x4dw"; // dtw distance to win
-const CODE_DATE = "EG0503";
+const CODE_DATE = "EG0506";
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
@@ -82,15 +82,15 @@ const pc_init = new Int32Array([
 //
 
 const brd_init_debug =
-/*[
+[
   " . . . .",
-  ". @ . . ",
-  " . . . .",
+  ". . o . ",
+  " . x . .",
   ". . . . ",
   " . . . x",
-  ". . . . ",
-  " . . # o",
-  ". . . . ",
+  "o . x . ",
+  " x . . .",
+  ". . . o ",
 ];
 /*/
 [
@@ -103,6 +103,7 @@ const brd_init_debug =
   " . o . .",
   ". . . . ",
 ];
+*/
 
 const pc_init_debug = pc_init;
 
@@ -2537,46 +2538,130 @@ const MAX_EXTRA_DEPTH = 3; // how many extra depths allowed beyond targetDepth
 let prvBestMove = 0, curBestMove = 0, curBestScore = -9999;
 
 async function think(){
-  const t0 = performance.now();   // start time
+  const t0 = performance.now();
+
   ply=0; maxply=0; mov_val_flat.fill(0);
+
   let score=0, depth=1, elapsed=0;
-  //prvBestMove = 0; curBestMove = 0;
-  const extraDepth = Math.min(MAX_EXTRA_DEPTH, Math.max(0, (16-pieceCount) >> 1));
-  //ttClear(); // 2-Mar, go back to use previous move's TT
+  const extraDepth = Math.min(MAX_EXTRA_DEPTH, Math.max(0, (16-pieceCount)>>1));
+
+  let histMoves = [], histScores = [];
 
   while(true) {
-    if(depth >= 10) await yieldThread(depth, score, elapsed, MIN_THINK_MS); // update UI
+    if(depth >= 10) await yieldThread(depth, score, elapsed, MIN_THINK_MS);
+
     prvBestMove = curBestMove;
-    follow_pv = true; score = search(MINALPHA, MAXBETA, depth);
-    curBestMove = pv[0][0], curBestScore = score;
-//console.log(FM(prvBestMove), FM(pv[0][0]));
-    if(LOGSCORE)console.log(depth,score,cellToNum[FM(pv[0][0])],cellToNum[TO(pv[0][0])]);
+    follow_pv = true;
+    score = search(MINALPHA, MAXBETA, depth);
+
+    const move = pv[0][0];
+    histMoves.push(move); histScores.push(score);
+
+    curBestMove = move; curBestScore = score;
+
+    if(LOGSCORE) console.log(depth,score,cellToNum[FM(move)],cellToNum[TO(move)]);
+
     elapsed = performance.now() - t0;
-    if(elapsed >= MAX_THINK_MS) break; // time limit
-    if(depth >= targetDepth && score < -9986) return false; // mate loss 9988
-    if(depth >= targetDepth && elapsed >= MIN_THINK_MS
-      && (score <= -300 || score >= 300 || depth >= targetDepth + extraDepth)) break;
+    if(elapsed >= MAX_THINK_MS) break;
+    if(depth >= targetDepth && score < -9986) return false;
+    if(depth >= targetDepth && elapsed >= MIN_THINK_MS &&
+      (score <= -300 || score >= 300 || depth >= targetDepth + extraDepth)) break;
     if(DEBUG && depth >= targetDepth) break;
     depth++;
   }
-  if(score>300) { showStyleIconIcon(false); showNewGame(true); }
-  thinkTime = performance.now() - t0; // end total time
-  if(thinkTime < 1000) thinkTime = 1000; // at least 1 second
-  compSeconds -= Math.floor(thinkTime/1000); if(compSeconds<0) compSeconds=0;
-  //startPlayerTimer(); // update comp timer
-  if(LOGSCORE) console.log("d",depth,"t",(thinkTime).toFixed(0),"sc",score,
+
+  const N = 6;
+  let stats = new Map();
+  let start = Math.max(0, histMoves.length - N);
+
+  // detect TB direction over FULL history (important)
+  let hasTBWin  = histScores.some(s => s >= 800);
+  let hasTBLoss = histScores.some(s => s <=-800);
+
+  for (let i = start; i < histMoves.length; i++) {
+    const m = histMoves[i], s = histScores[i];
+    // 1) global filter (you already have, keep it)
+    if (hasTBWin && s < 800) continue;
+    if (!hasTBWin && hasTBLoss && s > -800) continue;
+    const obj = classifyScore(s);
+    const w = Math.sqrt(i - start + 1); // safer than linear
+    let st = stats.get(m);
+    if (!st) stats.set(m, st = { count:0, sum:0, best:null, hasTB:false });
+    // 2) per-move TB lock
+    if (Math.abs(s) >= 800) st.hasTB = true;
+    // If this move already proved TB, ignore later non-TB noise for it
+    if (st.hasTB && Math.abs(s) < 800) continue;
+    st.count += w; st.sum   += s * w;
+    if (!st.best || better(obj, st.best)) st.best = obj;
+  }
+
+  let bestMove = 0, bestVal = -Infinity, bestObj = null;
+  for (let [m, st] of stats) {
+    if (LOGSCORE) console.log(cellToNum[FM(m)]+"-"+cellToNum[TO(m)],st.count);
+    const o = st.best;
+    let val =
+      o.tier * 100000 + o.win * 10000 +
+      (o.tier >= 2 ? (o.win > 0 ? -o.mag : o.mag)
+                   : (o.win >= 0 ?  o.mag : -o.mag)) +
+      st.count * 5000 + st.sum / st.count;
+    if (val > bestVal) {
+      bestVal = val; bestMove = m; bestObj = o;
+    }
+  }
+
+  curBestMove = bestMove;
+
+  // use bestObj (not last score)
+  if(bestObj && bestObj.win > 0 && bestObj.tier >= 1) {
+    showStyleIconIcon(false);
+    showNewGame(true);
+  }
+
+  thinkTime = performance.now() - t0;
+  if(thinkTime < 1000) thinkTime = 1000;
+
+  compSeconds -= (thinkTime/1000)|0;
+  if(compSeconds < 0) compSeconds = 0;
+
+  if(LOGSCORE) console.log("d",depth,"t",(thinkTime|0),"sc",score,
     "tt",ttStoreCnt,ttHitCnt,ttProbeCnt,ttCollision,
     "ep",eg4pStats.probeCnt,eg5pStats.probeCnt,eg6pStats.probeCnt,eg7pStats.probeCnt,
     "eh",eg4pStats.hitCnt,  eg5pStats.hitCnt,  eg6pStats.hitCnt,  eg7pStats.hitCnt,
     "dw",drawCount);
-  ttHitCnt=0; ttProbeCnt=0; 
-  eg4pStats.hitCnt=0; eg4pStats.probeCnt=0;
-  eg5pStats.hitCnt=0; eg5pStats.probeCnt=0;
-  eg6pStats.hitCnt=0; eg6pStats.probeCnt=0;
-  eg7pStats.hitCnt=0; eg7pStats.probeCnt=0;
-  evalTime=0; ttTime=0; genTime=0;
+  /*if (LOGSCORE)
+    console.log("BEST",cellToNum[FM(bestMove)] + "-" + cellToNum[TO(bestMove)],
+      "val", bestVal.toFixed(0),"tier", bestObj?.tier,
+      "win", bestObj?.win,"mag", bestObj?.mag);*/
+  ttHitCnt=ttProbeCnt=0;
+  eg4pStats.hitCnt=eg4pStats.probeCnt=0;
+  eg5pStats.hitCnt=eg5pStats.probeCnt=0;
+  eg6pStats.hitCnt=eg6pStats.probeCnt=0;
+  eg7pStats.hitCnt=eg7pStats.probeCnt=0;
+  evalTime=ttTime=genTime=0;
+
   return true;
 }
+
+function classifyScore(s) {
+  if (s > 9000) return { tier: 3, win: 1, mag: s };  // mate win
+  if (s <-9000) return { tier: 3, win:-1, mag:-s };  // mate loss
+  if (s >  800) return { tier: 2, win: 1, mag: s };  // TB win
+  if (s < -800) return { tier: 2, win:-1, mag:-s };  // TB loss
+  if (s >  200) return { tier: 1, win: 1, mag: s };  // eval win
+  if (s < -200) return { tier: 1, win:-1, mag:-s };  // eval loss
+  return { tier: 0, win: 0, mag: Math.abs(s) };      // draw-ish
+}
+
+function better(a, b) {
+  if (!b) return true;
+  if (a.tier !== b.tier) return a.tier > b.tier;
+  if (a.win !== b.win)   return a.win  > b.win;
+  if (a.tier >= 2)       return a.win  > 0 ? a.mag < b.mag : a.mag > b.mag;
+  return a.win >= 0 ? a.mag > b.mag : a.mag < b.mag;
+}
+
+
+
 
 async function yieldThread(depth, score, elapsed) {
   /*
@@ -2650,7 +2735,8 @@ async function aiMainLoop(){
     // AI think
     if(bestmv===0){ 
       if(await think()===false){ gameOver(1); break; }
-      bestmv=pv[0][0];
+      //bestmv=pv[0][0]; // use bestmove from last depth search
+      bestmv = curBestMove; // use final ai decision on bestmove
     }
     if(!(gen_dat[0] & MSKIP)) { 
       bCompBusy = true; drawPieces(); 
@@ -3125,6 +3211,30 @@ function egHash(board = pc, isLght = (side === LGHT)) {
   return h & MASK_63;  // return 63-bit unsigned bigint
 }
 
+const charToBase36 = new Int8Array(128).fill(-1);
+for (let i = 0; i < 10; i++) {
+  charToBase36[48 + i] = i;        // '0'–'9'
+}
+for (let i = 0; i < 26; i++) {
+  charToBase36[65 + i] = 10 + i;   // 'A'–'Z'
+  charToBase36[97 + i] = 10 + i;   // 'a'–'z'
+}
+
+function egHashFromLine(line) {
+  const zp = zobrist_piece;
+  let h = 0n;
+  for (let i = 0; i < 16; i++) {
+    const v = charToBase36[line.charCodeAt(i)];
+    const p1 = (v / 6) | 0;
+    const p2 = v % 6;
+    const sq1 = i * 2;
+    const sq2 = sq1 + 1;
+    if (p1 < 4) h ^= zp[sq1][p1];
+    if (p2 < 4) h ^= zp[sq2][p2];
+  }
+  return h & MASK_63;
+}
+
 // ============================================================
 //  ENDGAME DATABASE  (4P + 5P, base-36 format)
 // ============================================================
@@ -3303,9 +3413,13 @@ async function load7PDB(zipUrl = "background7s.jpg", innerFile = "description7s.
   eg7pReady = true;
 }
 
+
+
 async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
   try {
     if (!USE_EG) return 1;
+    const dtwWinHist  = new Uint32Array(1024);
+    const dtwLossHist = new Uint32Array(1024);
     const response = await fetch(zipUrl);
     const blob = await response.blob();
     const zip  = await JSZip.loadAsync(blob);
@@ -3315,33 +3429,44 @@ async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
     //side = LGHT;
     let count = 0;
     const lines = text.split('\n');
-    const CHUNK = 10000;
+    const CHUNK = 20000;
     for (let i = 0; i < lines.length; i += CHUNK) {
-      while (bCompBusy) await holdMs(100); // pause if engine thinking
+      while (bCompBusy) await holdMs(10); // pause if engine thinking
       const end = Math.min(i + CHUNK, lines.length);
       for (let j = i; j < end; j++) {
         const line = lines[j];
         if (line.length < 17) continue;
-        const dtwStr = line.length === 17 ? line[16] : line.substring(16, 18);
-        //const flag = line[16];
-        //const val  = flag==='W' ? EG_W : flag==='L' ? EG_L : flag==='D' ? EG_D : 0;
-        //if (!val) continue;
-        boardDecodeBase36(line,true);
-        const clean = line.trim();
-        const c1 = clean[16];
-        const c2 = clean[17] || "";
-        const signedDTW = decodeDTW(c1, c2);
-        if (signedDTW === null) continue;
-        const val = signedDTW > 0 ? EG_W : EG_L;
-        const dtw = signedDTW > 0 ? signedDTW : -signedDTW;
-        const zkey = egHash(egpc,true);
+        const c1c = line.charCodeAt(16);
+        let c2c = line.charCodeAt(17);
+
+        // normalize c2c
+        c2c = (c2c === 13 || c2c === undefined) ? 0 : c2c;
+
+        let sign = (c1c >= 97) ? -1 : 1;
+        let base = (sign > 0 ? 65 : 97);
+        let hi = c1c - base + 1;
+
+        let signedDTW = c2c
+          ? sign * ((hi - 1) * 26 + (c2c - base) + 1)
+          : sign * hi;
+
+        const isWin = signedDTW > 0;
+        const val = isWin ? EG_W : EG_L;
+        const dtw = isWin ? signedDTW : -signedDTW;
+        const zkey = egHashFromLine(line);
         if (storeFn(zkey, val, dtw)) count++;
+        if (isWin) dtwWinHist[dtw]++;
+        else dtwLossHist[dtw]++;
       }
       await yieldUI();
     }
     //clearBoard();
     //side = LGHT;
     if (DEBUG) console.log(label, "loaded", count, "shf", stats.maxShift);
+    if (DEBUG) for (let i = 1; i < 50; i++) {
+      if (dtwWinHist[i] || dtwLossHist[i])
+        console.log("dtw", i,"W:", dtwWinHist[i],"L:", dtwLossHist[i]);
+    }
     return count;
   } catch (err) {
     if (DEBUG) console.error(label, "load failed:", err);
