@@ -38,11 +38,14 @@ Zobrist key is 64 bits to avoid key duplication.
 "use strict";
 
 const CODE_VERSION = "x4dw"; // dtw distance to win
-const CODE_DATE = "EG0506";
+const CODE_DATE = "EG0512";
+//const isMobi = /Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+const isMobi = false;
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
-const LOGSCORE = false;
+const LOGSCORE = DEBUG;
+const FOOTER = DEBUG;
 const USE_BK = true;
 const USE_TT = true;
 const USE_EG = true;
@@ -84,13 +87,13 @@ const pc_init = new Int32Array([
 const brd_init_debug =
 [
   " . . . .",
-  ". . o . ",
-  " . x . .",
   ". . . . ",
-  " . . . x",
-  "o . x . ",
-  " x . . .",
+  " . x x .",
+  ". . x . ",
+  " . . o .",
   ". . . o ",
+  " o . . .",
+  ". . . . ",
 ];
 /*/
 [
@@ -105,9 +108,8 @@ const brd_init_debug =
 ];
 */
 
-const pc_init_debug = pc_init;
-
-//const pc_init_debug = textToBoard(brd_init_debug);
+//const pc_init_debug = pc_init;
+const pc_init_debug = textToBoard(brd_init_debug);
 
 /*/
 
@@ -303,14 +305,57 @@ function initArrays() {
   initDomRefs(); initZobrist(); 
 }
 
+function getDeviceMetrics() {
+    const metrics = {
+        // Returns RAM in GB (e.g., 8, 4), available in Chrome/Edge/Opera
+        ram: navigator.deviceMemory || "",
+        // A rough way to detect mobile vs desktop
+        device: (function() {
+            const ua = navigator.userAgent;
+            const platform = navigator.platform || "";
+
+            // 1. Windows is easy to catch
+            if (/Win/i.test(ua) || /Win/i.test(platform)) return "Windows";
+
+            // 2. Specialized iPad check (Modern iPads identify as Mac)
+            if (/Mac/i.test(ua) && navigator.maxTouchPoints > 1) return "iPad";
+
+            // 3. Standard Mac (no touch)
+            if (/Mac/i.test(ua) || /Mac/i.test(platform)) return "Mac";
+
+            // 4. Mobile Devices
+            if (/Android/i.test(ua)) return "Android";
+            if (/iPhone/i.test(ua)) return "iPhone";
+            
+            // 5. Generic Mobile/Linux catch-all
+            if (/Mobi/i.test(ua)) return "Mobile";
+            if (/Linux/i.test(platform)) return "Linux";
+
+            return "Desktop"; 
+        })(),
+        // Get browser name (simplified)
+        browser: (function() {
+            const ua = navigator.userAgent;
+            if (ua.includes("Firefox")) return "Firefox";
+            if (ua.includes("Edg")) return "Edge";
+            if (ua.includes("Chrome")) return "Chrome";
+            if (ua.includes("Safari")) return "Safari";
+            return "Other";
+
+        })()
+    };
+    return "&result="+metrics.browser+"-"+metrics.device + "&moves="+metrics.ram+"GB";
+}
+
 function waitForAssets() {
   //if (!imagesLoaded || bkdbLoaded === 0 || eg4pLoaded === 0 || eg5pLoaded === 0) {
   if (!imagesLoaded || bkdbLoaded === 0) {  // 8-Apr: load egdb in background
     setTimeout(waitForAssets, 100); return; 
   }
-  const s = "level=" + CODE_DATE + "&result=" + eg4pLoaded + "-" + eg5pLoaded
-            + "&moves=" + bkdbLoaded;
+  const q = getDeviceMetrics();
+  const s = "level=" + CODE_DATE + q;
   if(DEBUG) console.log(s);
+  if(FOOTER) footer(s);
   fetch(VISIT_LOG_URL + s);
   clearBoard(); startGame(); //resizeAllCanvases();
   message("by Jaroonsak Wangviwat"); 
@@ -2039,37 +2084,10 @@ function myeval(){
   if ((L_PWN_cnt|L_HRS_cnt)===0) return sideIsL?-MAXBETA+ply: MAXBETA-ply;
   if ((D_PWN_cnt|D_HRS_cnt)===0) return sideIsL? MAXBETA-ply:-MAXBETA+ply;
 
-  // score based on position of pieces
-  const table = (moveCount < MID_GAME) ? pcsq : pcsq_end;
-  /*for (let e = 0; e < 64; e++) {
-    if (pc[e] === L_PWN) score_LGHT += table[e];
-    else if (pc[e] === D_PWN) score_DARK += table[63 - e];
-  }*/
-  for (let i = 0; i < 32; i++) {
-    const q = pcConv[i], p = pc[q];
-    if (p === EMPTY) continue;
-    if (p === L_PWN) score_LGHT += table[q];
-    else if (p === D_PWN) score_DARK += table[63-q];
-  }
   updatePieceCode();
-  //if(pieceCount !== L_PWN_cnt + L_HRS_cnt + D_PWN_cnt + D_HRS_cnt) console.log("pieceCount error!!");
-
-  // 3-Feb-2026 rewrite score for endgame
-  //if(USE_EG && egdbReady && pieceCount <= 5) {
-  
-  /*if(USE_EG && pieceCount <= 7) {
-    let pawnCnt = 0;
-    for (let i = 0; i < 32; i++) {                      // positional score
-      const q = pcConv[i], p = pc[q];
-      if (p === EMPTY) continue;
-      if (p === L_PWN) scorePc += PRANK(q) + 5;         // light pawn score
-      else if (p === D_PWN) scorePc += PRANK(63-q) + 5; // dark pawn mirrored score
-    }
-  }*/
   
   // ============== 4P EGDB ================
   if(USE_EG && pieceCount<=4 && eg4pReady) { // egdb for 4 pieces
-  //if(USE_EG && pieceCount <= 4) { // egdb for 4 pieces
     if(pieceCode == 1010) return 0; // both sides 2 hrs draw
     let pawnCnt = 0;
     for (let i = 0; i < 32; i++) {                      // positional score
@@ -2084,130 +2102,67 @@ function myeval(){
 
     const zkey = egHash();
     const { result, dtw } = probe4p(zkey);
+    if (DEBUG && result !== 0) eg4pStats.hitCnt++;
+    if (result === EG_W) return  1000 - dtw;
+    if (result === EG_L) return -1000 + dtw;
 
-    if (result !== 0) {
-      if (DEBUG) eg4pStats.hitCnt++;
-      if (result === EG_W) 
-        return dtw > 0 ? (1000 - dtw) : (1000 + ply);
-      if (result === EG_L) 
-        return dtw > 0 ? (-1000 + dtw) : (-1000 - ply);
-    }
     // 4p fallback
     let drawBias = 0;
-    if (level === 0 || level >= 2) {
-      const bal = (L_PWN_cnt + L_HRS_cnt) - (D_PWN_cnt + D_HRS_cnt);
-      let sign = (level === 0) ? -1 : Math.sign(sideIsL ? bal : -bal);
-      if (sign === 0) sign = -1;
-      drawBias = sign * scorePc;
-    }
+    const bal = (L_PWN_cnt + L_HRS_cnt) - (D_PWN_cnt + D_HRS_cnt);
+    let sign;
+    if (level === 0) sign = -1;  // intentionally bad / defensive
+    else sign = Math.sign(sideIsL ? bal : -bal);
+    if (sign === 0) sign = -1;
+    drawBias = sign * scorePc;
     return drawBias;
   }
 
   // ============== 5P EGDB ================
-  if (USE_EG && pieceCount === 5) {
+  if (USE_EG && pieceCount === 5 && eg5pReady) {
     const zkey = egHash();
     const { result, dtw } = probe5p(zkey);
-    if (result !== 0) {
-      if (DEBUG) eg5pStats.hitCnt++;
-      if (result === EG_W) 
-        return dtw > 0 ? (1000 - dtw) : (1000 + ply);
-      if (result === EG_L) 
-        return dtw > 0 ? (-1000 + dtw) : (-1000 - ply);
-    }
+    if (DEBUG && result !== 0) eg5pStats.hitCnt++;
+    if (result === EG_W) return  1000 - dtw;
+    if (result === EG_L) return -1000 + dtw;
+
   }
 
   // ============== 6P EGDB ================
-  if (USE_EG && pieceCount === 6) {
+  if (USE_EG && pieceCount === 6 && eg6pReady) {
     const zkey = egHash();
     const { result, dtw } = probe6p(zkey);
-    if (result !== 0) {
-      if (DEBUG) eg6pStats.hitCnt++;
-      if (result === EG_W) 
-        return dtw > 0 ? (1000 - dtw) : (1000 + ply);
-      if (result === EG_L) 
-        return dtw > 0 ? (-1000 + dtw) : (-1000 - ply);
-    }
+    if (DEBUG && result !== 0) eg6pStats.hitCnt++;
+    if (result === EG_W) return  1000 - dtw;
+    if (result === EG_L) return -1000 + dtw;
   }
 
   // ============== 7P EGDB ================
-  if (USE_EG && pieceCount === 7)
-  if (pieceCode === 1204 || pieceCode === 412) {
+  if (USE_EG && pieceCount === 7 && eg7pReady
+    && (pieceCode === 1204 || pieceCode === 412)) {
     const zkey = egHash();
     const { result, dtw } = probe7p(zkey);
-    if (result !== 0) {
-      if (DEBUG) eg7pStats.hitCnt++;
-      if (result === EG_W) 
-        return dtw > 0 ? (1000 - dtw) : (1000 + ply);
-      if (result === EG_L) 
-        return dtw > 0 ? (-1000 + dtw) : (-1000 - ply);
-    }
+    if (DEBUG && result !== 0) eg7pStats.hitCnt++;
+    if (result === EG_W) return  1000 - dtw;
+    if (result === EG_L) return -1000 + dtw;
   }
-
 
   /////////////////////////////////////////////////
 
-  /* disable, 3-Apr
 
-  // ===== SPECIAL 1103 0311 FORCED WIN PATTERNS =====
-  
-  // 1103 → LIGHT WIN
-  if (pieceCount===5 && L_HRS_cnt===1 && L_PWN_cnt===1 && D_HRS_cnt===0 && D_PWN_cnt===3) { 
-    if (checkPattern(P_CENTER1,P_ABOVE1,P_FACE1) || 
-        checkPattern(P_CENTER2,P_ABOVE2,P_FACE2) ) {
-      if(DEBUG)console.log("1103, value=",sideIsL ? 500 - ply : -500 + ply);
-      return sideIsL ? 500 - ply : -500 + ply;
-    }
+  // score based on position of pieces
+  const table = (moveCount < MID_GAME) ? pcsq : pcsq_end;
+  for (let i = 0; i < 32; i++) {
+    const q = pcConv[i], p = pc[q];
+    if (p === EMPTY) continue;
+    if (p === L_PWN) score_LGHT += table[q];
+    else if (p === D_PWN) score_DARK += table[63-q];
   }
-  // 0311 → DARK WIN
-  if (pieceCount===5 && L_HRS_cnt===0 && L_PWN_cnt===3 && D_HRS_cnt===1 && D_PWN_cnt===1) {
-    if (checkPattern(P_CENTER1,P_ABOVE1,P_FACE1,true) ||
-        checkPattern(P_CENTER2,P_ABOVE2,P_FACE2,true) ) {
-      if(DEBUG)console.log("0311, value=",sideIsL ? -500 + ply : 500 - ply);
-      return sideIsL ? -500 + ply : 500 - ply;
-    }
-  }
-  
-  // 1204 → LIGHT WIN
-  if (pieceCount===7 && L_HRS_cnt===1 && L_PWN_cnt===2 && D_HRS_cnt===0 && D_PWN_cnt===4) {
-    if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,2) ||
-        checkTwoFacePairs(P_CENTER2,P_ABOVE2,P_FACE2PAIRS2,2) ) {
-      if(DEBUG)console.log("1204, value=",sideIsL ? 500 - ply : -500 + ply);
-      return sideIsL ? 500 - ply : -500 + ply;
-    }
-  }
-  // 0412 → DARK WIN
-  if (pieceCount===7 && L_HRS_cnt===0 && L_PWN_cnt===4 && D_HRS_cnt===1 && D_PWN_cnt===2) {
-    if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,2,true) ||
-        checkTwoFacePairs(P_CENTER2,P_ABOVE2,P_FACE2PAIRS2,2,true) ) {
-      if(DEBUG)console.log("0412, value=",sideIsL ? -500 + ply : 500 - ply);
-      return sideIsL ? -500 + ply : 500 - ply;
-    }
-  }
-  // 1203 → LIGHT WIN
-  if (pieceCount===6 && L_HRS_cnt===1 && L_PWN_cnt===2 && D_HRS_cnt===0 && D_PWN_cnt===3) {
-    if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,1) ||
-        checkTwoFacePairs(P_CENTER2,P_ABOVE2,P_FACE2PAIRS2,1) ) {
-      if(DEBUG)console.log("1203, value=",sideIsL ? 500 - ply : -500 + ply);
-      return sideIsL ? 500 - ply : -500 + ply;
-    }
-  }
-  // 0312 → DARK WIN
-  if (pieceCount===6 && L_HRS_cnt===0 && L_PWN_cnt===3 && D_HRS_cnt===1 && D_PWN_cnt===2) {
-    if (checkTwoFacePairs(P_CENTER1,P_ABOVE1,P_FACE2PAIRS1,1,true) ||
-        checkTwoFacePairs(P_CENTER2,P_ABOVE2,P_FACE2PAIRS2,1,true) ) {
-      if(DEBUG)console.log("0312, value=",sideIsL ? -500 + ply : 500 - ply);
-      return sideIsL ? -500 + ply : 500 - ply;
-    }
-  }
-  */
-
-  /////////////////////////////////////////////////
 
   // === Piece Count Bonus ===
   score_LGHT += (L_PWN_cnt * PWN_VAL + L_HRS_cnt * HRS_VAL);
   score_DARK += (D_PWN_cnt * PWN_VAL + D_HRS_cnt * HRS_VAL_D);
   // --- preservation bias ---
-  score_LGHT += (L_PWN_cnt + L_HRS_cnt) * D_CNT_BONUS; // apply to only computer side
+  score_LGHT += (L_PWN_cnt + L_HRS_cnt) * D_CNT_BONUS;
   score_DARK += (D_PWN_cnt + D_HRS_cnt) * D_CNT_BONUS;
 
   // === Bad Position Penalty ===
@@ -2268,11 +2223,64 @@ function myeval(){
     if (pc[62] == L_PWN && pc[55] == D_PWN) score_LGHT += 15;
   }
 
+  // === bonus for empty path ===
+  
+  if (pieceCount > 8) {
+    let dbonus = 0, lbonus = 0;
+    // 1 move away
+    if (pc[49] === D_PWN && pc[56] === EMPTY && pc[58] === EMPTY) dbonus += 50;
+    if (pc[51] === D_PWN && pc[58] === EMPTY && pc[60] === EMPTY) dbonus += 50;
+    if (pc[53] === D_PWN && pc[60] === EMPTY && pc[62] === EMPTY) dbonus += 50;
+    if (pc[55] === D_PWN && pc[62] === EMPTY) dbonus += 50;
+    // 2 moves away
+    if (pc[40] === D_PWN) {
+      if (  pc[49] === EMPTY && pc[56] === EMPTY && pc[58] === EMPTY)   dbonus += 25;
+    }
+    if (pc[42] === D_PWN) {
+      if ( (pc[49] === EMPTY && pc[56] === EMPTY && pc[58] === EMPTY) || 
+           (pc[51] === EMPTY && pc[58] === EMPTY && pc[60] === EMPTY) ) dbonus += 25;
+    }
+    if (pc[44] === D_PWN) {
+      if ( (pc[51] === EMPTY && pc[58] === EMPTY && pc[60] === EMPTY) || 
+           (pc[53] === EMPTY && pc[60] === EMPTY && pc[62] === EMPTY) ) dbonus += 25;
+    }
+    if (pc[46] === D_PWN) {
+      if ( (pc[53] === EMPTY && pc[60] === EMPTY && pc[62] === EMPTY) || 
+           (pc[55] === EMPTY && pc[62] === EMPTY) ) dbonus += 25;
+    }
+    score_DARK += dbonus;
+
+    // 1 move away
+    if (pc[14] === L_PWN && pc[7]  === EMPTY && pc[5]  === EMPTY) lbonus += 50;
+    if (pc[12] === L_PWN && pc[5]  === EMPTY && pc[3]  === EMPTY) lbonus += 50;
+    if (pc[10] === L_PWN && pc[3]  === EMPTY && pc[1]  === EMPTY) lbonus += 50;
+    if (pc[8]  === L_PWN && pc[1]  === EMPTY) lbonus += 50;
+    // 2 moves away
+    if (pc[23] === L_PWN) {
+      if (pc[14] === EMPTY && pc[7] === EMPTY && pc[5] === EMPTY) lbonus += 25;
+    }
+    if (pc[21] === L_PWN) {
+      if ((pc[14] === EMPTY && pc[7] === EMPTY && pc[5] === EMPTY) ||
+          (pc[12] === EMPTY && pc[5] === EMPTY && pc[3] === EMPTY)) lbonus += 25;
+    }
+    if (pc[19] === L_PWN) {
+      if ((pc[12] === EMPTY && pc[5] === EMPTY && pc[3] === EMPTY) ||
+          (pc[10] === EMPTY && pc[3] === EMPTY && pc[1] === EMPTY)) lbonus += 25;
+    }
+    if (pc[17] === L_PWN) {
+      if ((pc[10] === EMPTY && pc[3] === EMPTY && pc[1] === EMPTY) ||
+          (pc[8]  === EMPTY && pc[1] === EMPTY)) lbonus += 25;
+    }
+    score_LGHT += lbonus;
+  }
+
+
   //evalTime += (performance.now() - t0);
   return (sideIsL ? score_LGHT - score_DARK : score_DARK - score_LGHT);
 }
 
-// =========== eval helpers ============
+/*
+// =========== ORCED WIN PATTERNS ============
 
 // ===== 1103 / 0311 FORCED WIN PATTERNS =====
 // Pattern 1
@@ -2383,6 +2391,7 @@ function checkTwoFacePairs(center, above, face2pairs, aboveCnt, mirror=false) {
   }
   return false;
 }
+*/
 
 
 // global objects to accumulate times
@@ -2575,8 +2584,11 @@ async function think(){
   let start = Math.max(0, histMoves.length - N);
 
   // detect TB direction over FULL history (important)
-  let hasTBWin  = histScores.some(s => s >= 800);
-  let hasTBLoss = histScores.some(s => s <=-800);
+  const window = histScores.slice(start);
+  let hasTBWin  = window.some(s => s >=  800);
+  let hasTBLoss = window.some(s => s <= -800);
+  // safety net:
+  if (stats.size === 0) { curBestMove = histMoves.at(-1); }
 
   for (let i = start; i < histMoves.length; i++) {
     const m = histMoves[i], s = histScores[i];
@@ -2603,7 +2615,7 @@ async function think(){
       o.tier * 100000 + o.win * 10000 +
       (o.tier >= 2 ? (o.win > 0 ? -o.mag : o.mag)
                    : (o.win >= 0 ?  o.mag : -o.mag)) +
-      st.count * 5000 + st.sum / st.count;
+      st.count * 500 + st.sum / st.count;
     if (val > bestVal) {
       bestVal = val; bestMove = m; bestObj = o;
     }
@@ -2628,10 +2640,8 @@ async function think(){
     "ep",eg4pStats.probeCnt,eg5pStats.probeCnt,eg6pStats.probeCnt,eg7pStats.probeCnt,
     "eh",eg4pStats.hitCnt,  eg5pStats.hitCnt,  eg6pStats.hitCnt,  eg7pStats.hitCnt,
     "dw",drawCount);
-  /*if (LOGSCORE)
-    console.log("BEST",cellToNum[FM(bestMove)] + "-" + cellToNum[TO(bestMove)],
-      "val", bestVal.toFixed(0),"tier", bestObj?.tier,
-      "win", bestObj?.win,"mag", bestObj?.mag);*/
+  if(FOOTER) footer("d"+depth+" sc"+score+" BEST"+
+    cellToNum[FM(bestMove)]+"-"+cellToNum[TO(bestMove)]);
   ttHitCnt=ttProbeCnt=0;
   eg4pStats.hitCnt=eg4pStats.probeCnt=0;
   eg5pStats.hitCnt=eg5pStats.probeCnt=0;
@@ -2818,7 +2828,7 @@ function gameOver(r) { // +1 player won, 0 draw, -1 player lost
   gameResultStr += level + result + " ";
   
   //console.log(gameCount,level,result,elapsed,gameResultStr,moveHistoryStr);
-  let url = VISIT_LOG_URL + "level=" + level + "&result=" + encodeURIComponent(gameResultStr);
+  let url = VISIT_LOG_URL + "level=" + egProgress + "&result=" + encodeURIComponent(gameResultStr);
   if (level > 0 && result === "W") url += "&moves=" + encodeURIComponent(moveHistoryStr);
   fetch(url); // log
 
@@ -2954,7 +2964,7 @@ function initZobrist() {
 const TT_EXACT = 0, TT_ALPHA = 1, TT_BETA = 2;
 
 // ---------- Typed-array TT declarations (replace Map-based TT) ----------
-const TT_POW = 22;                 // 2^22 = 4M entries
+const TT_POW = isMobi ? 21 : 22; // 2^22 = 4M entries
 const TT_SIZE = 1 << TT_POW;
 const TT_MASK = TT_SIZE - 1;
 let ttHitCnt = 0, ttProbeCnt = 0, ttStoreCnt = 0, ttCollision = 0;
@@ -3135,21 +3145,21 @@ const eg4p_keylo = new Uint32Array(EG4P_SIZE);
 const eg4p_keyhi = new Uint32Array(EG4P_SIZE);
 const eg4p_dtw   = new Int8Array(EG4P_SIZE);
 
-const EG5P_POW = 24; // 16M slots
+const EG5P_POW = isMobi ? 8 : 24; // 16M slots
 const EG5P_SIZE = 1 << EG5P_POW;
 const EG5P_MASK = EG5P_SIZE - 1;
 const eg5p_keylo = new Uint32Array(EG5P_SIZE);
 const eg5p_keyhi = new Uint32Array(EG5P_SIZE);
 const eg5p_dtw   = new Int8Array(EG5P_SIZE);
 
-const EG6P_POW = 24; // 16M slots
+const EG6P_POW = isMobi ? 8 : 24; // 16M slots
 const EG6P_SIZE = 1 << EG6P_POW;
 const EG6P_MASK = EG6P_SIZE - 1;
 const eg6p_keylo = new Uint32Array(EG6P_SIZE);
 const eg6p_keyhi = new Uint32Array(EG6P_SIZE);
 const eg6p_dtw   = new Int8Array(EG6P_SIZE);
 
-const EG7P_POW = 23; // 8M slots
+const EG7P_POW = isMobi ? 8 : 23; // 8M slots
 const EG7P_SIZE = 1 << EG7P_POW;
 const EG7P_MASK = EG7P_SIZE - 1;
 const eg7p_keylo = new Uint32Array(EG7P_SIZE);
@@ -3169,7 +3179,7 @@ const eg7pStats = {
   stored:0,dup:0,probeCnt:0,hitCnt:0,maxShift:0,shiftHist:new Uint32Array(64)
 };
 
-let eg4pLoaded = 0, eg5pLoaded = 0, eg6pLoaded = 0, eg7pLoaded = 0;
+let eg4pLoaded = 0, eg5pLoaded = 0, eg6pLoaded = 0, eg7pLoaded = 0, egProgress = 0;
 let eg4pReady = false, eg5pReady = false, 
     eg6pReady = false, eg7pReady = false, egdbReady = false;
 
@@ -3183,15 +3193,16 @@ for (let p = 0; p < 6; p++)
 
 async function loadAllEGDB() {
   await load4PDB(); await holdMs();
+  if (isMobi) return; // skip
   await load5PDB(); await holdMs();
   await load6PDB(); await holdMs();
   await load7PDB(); await holdMs();
   //egdbReady = true;
 }
 
-function waitForEGDB() {
+/*function waitForEGDB() {
   if(!egdbReady) { setTimeout(waitForEGDB, 500); return; }
-}
+}*/
 
 // hash position for endgame, diff key for light and dark side
 function egHash(board = pc, isLght = (side === LGHT)) {
@@ -3392,25 +3403,25 @@ function probe7p(zkey){
 
 // ---------- loaders ----------
 
-async function load4PDB(zipUrl = "background4q.jpg", innerFile = "description4q.txt") {
+async function load4PDB(zipUrl = "background4w.jpg", innerFile = "description4w.txt") {
   eg4p_keylo.fill(0); eg4p_keyhi.fill(0); eg4p_dtw.fill(0);
   eg4pLoaded = await loadEGDB(zipUrl, innerFile, store4p, eg4pStats, "4PDB");
-  eg4pReady = true;
+  eg4pReady = true; egProgress = 4;
 }
-async function load5PDB(zipUrl = "background5s.jpg", innerFile = "description5s.txt") {
+async function load5PDB(zipUrl = "background5w.jpg", innerFile = "description5w.txt") {
   eg5p_keylo.fill(0); eg5p_keyhi.fill(0); eg5p_dtw.fill(0);
   eg5pLoaded = await loadEGDB(zipUrl, innerFile, store5p, eg5pStats, "5PDB");
-  eg5pReady = true;
+  eg5pReady = true; egProgress = 5;
 }
-async function load6PDB(zipUrl = "background6s.jpg", innerFile = "description6s.txt") {
+async function load6PDB(zipUrl = "background6w.jpg", innerFile = "description6w.txt") {
   eg6p_keylo.fill(0); eg6p_keyhi.fill(0); eg6p_dtw.fill(0);
   eg6pLoaded = await loadEGDB(zipUrl, innerFile, store6p, eg6pStats, "6PDB");
-  eg6pReady = true;
+  eg6pReady = true; egProgress = 6;
 }
-async function load7PDB(zipUrl = "background7s.jpg", innerFile = "description7s.txt") {
+async function load7PDB(zipUrl = "background7w.jpg", innerFile = "description7w.txt") {
   eg7p_keylo.fill(0); eg7p_keyhi.fill(0); eg7p_dtw.fill(0);
   eg7pLoaded = await loadEGDB(zipUrl, innerFile, store7p, eg7pStats, "7PDB");
-  eg7pReady = true;
+  eg7pReady = true; egProgress = 7;
 }
 
 
@@ -3426,9 +3437,9 @@ async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
     const file = zip.file(innerFile);
     if (!file) throw new Error(`${innerFile} not found`);
     const text = await file.async("text"); // still blocking, freeze briefly
-    //side = LGHT;
     let count = 0;
     const lines = text.split('\n');
+    //footer("lines.length="+lines.length);
     const CHUNK = 20000;
     for (let i = 0; i < lines.length; i += CHUNK) {
       while (bCompBusy) await holdMs(10); // pause if engine thinking
@@ -3458,15 +3469,17 @@ async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
         if (isWin) dtwWinHist[dtw]++;
         else dtwLossHist[dtw]++;
       }
+      //footer(count);
       await yieldUI();
     }
     //clearBoard();
     //side = LGHT;
     if (DEBUG) console.log(label, "loaded", count, "shf", stats.maxShift);
-    if (DEBUG) for (let i = 1; i < 50; i++) {
+    if (FOOTER) footer(label, "loaded", count, "shf", stats.maxShift);
+    /*if (DEBUG) for (let i = 1; i < 50; i++) {
       if (dtwWinHist[i] || dtwLossHist[i])
         console.log("dtw", i,"W:", dtwWinHist[i],"L:", dtwLossHist[i]);
-    }
+    }*/
     return count;
   } catch (err) {
     if (DEBUG) console.error(label, "load failed:", err);
@@ -3475,10 +3488,11 @@ async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
 }
 
 function yieldUI() {
-  if (window.requestIdleCallback) {
+  /*if (window.requestIdleCallback) {
     return new Promise(resolve => requestIdleCallback(resolve));
   }
-  return hold(0);
+  return hold(0);*/
+  return new Promise(resolve => setTimeout(resolve, 0));
 }
 
 
