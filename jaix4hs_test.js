@@ -2304,6 +2304,7 @@ function evalScoreForPiece(sq, p) {
   return 0;
 }
 
+// Call this in initBoard() and after pc_init_debug setup:
 function recalcEvalScore() {
   cur_pcsq = (moveCount < MID_GAME) ? pcsq : pcsq_end;
   evalScoreL = 0;
@@ -2313,6 +2314,7 @@ function recalcEvalScore() {
     evalScoreL += evalScoreForPiece(q, p);
   }
 }
+
 
 
 // global objects to accumulate times
