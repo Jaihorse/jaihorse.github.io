@@ -49,7 +49,7 @@ const FOOTER = DEBUG;
 const USE_BK = true;
 const USE_TT = true;
 const USE_EG = true;
-const BASE_DEPTH = 11;   // depth for level 1, depth 11 takes 5-10 sec per move
+const BASE_DEPTH = 10;   // depth for level 1, depth 11 takes 5-10 sec per move
 const MAX_LEVEL = 2;
 
 let level = 1, prevLevel = level; // start level
@@ -2677,7 +2677,7 @@ function takeback(){
 
  *************************************************/
 
-const MIN_THINK_MS = 500, MAX_THINK_MS = 5000; // time to think in ms
+const MIN_THINK_MS = 800, MAX_THINK_MS = 5000; // time to think in ms
 const MAX_EXTRA_DEPTH = 3; // how many extra depths allowed beyond targetDepth
 let prvBestMove = 0, curBestMove = 0, curBestScore = -9999;
 
@@ -2712,10 +2712,11 @@ async function think(){
 
     elapsed = performance.now() - t0;
     if(elapsed >= MAX_THINK_MS) break;
+    if(depth >= targetDepth + extraDepth) break;
     if(depth >= targetDepth && score < -9986) return false;
     if(depth >= targetDepth && elapsed >= MIN_THINK_MS &&
       (score <= -300 || score >= 300 || depth >= targetDepth + extraDepth)) break;
-    if(DEBUG && depth >= targetDepth) break;
+    //if(DEBUG && depth >= targetDepth) break;
     depth++;
   }
 
@@ -3678,6 +3679,8 @@ const b36 = new Int8Array(128).fill(-1);
 for (let i = 0; i < 10; i++) b36[48 + i] = i;
 for (let i = 0; i < 26; i++) { b36[65 + i] = 10 + i; b36[97 + i] = 10 + i; }
 
+let max_dtw = 0, min_dtw = 0;
+
 async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
   try {
     if (!USE_EG) return 1;
@@ -3692,28 +3695,26 @@ async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
     const len = raw.length;
     let count = 0;
 
-    const CHUNK_ROWS = 50000;
+    const CHUNK_ROWS = 10000;
     let pos = 0, rowsInChunk = 0;
 
     while (pos < len) {
 
-      // find '\n'
       let end = pos;
-      while (end < len && raw[end] !== 10) end++;
+      while (end < len && raw[end] !== 10) end++; // find '\n'
 
       const lineLen = end - pos;
 
-      // ✅ STRICT validation (critical fix)
       if (lineLen === 17 || lineLen === 18) {
 
         // quick sanity check (prevents desync cascade)
         if (b36[raw[pos]] >= 0) {
 
-          let lo = 0 >>> 0, hi = 0 >>> 0;
+          let lo = 0 >>> 0, hi = 0 >>> 0, valid = true;
 
           for (let i = 0; i < 16; i++) {
             const v = b36[raw[pos + i]];
-            if (v < 0) { lo = -1; break; }
+            if (v < 0) { valid = false; break; }
 
             const p1 = (v / 6) | 0;
             const p2 = v % 6;
@@ -3732,7 +3733,7 @@ async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
             }
           }
 
-          if (lo >= 0) {
+          if (valid) {
             const c1 = raw[pos + 16];
             const c2 = lineLen === 18 ? raw[pos + 17] : 0;
 
@@ -3745,6 +3746,11 @@ async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
             const signedDTW = c2
               ? sign * ((hiDTW - 1) * 26 + (c2 - base) + 1)
               : sign * hiDTW;
+            // clamp to 126
+            if (DEBUG && signedDTW > max_dtw) max_dtw = signedDTW;
+            if (DEBUG && signedDTW < min_dtw) min_dtw = signedDTW;
+            if (signedDTW > 126) signedDTW = 126;
+            else if (signedDTW < -126) signedDTW = -126;
 
             const isWin = signedDTW > 0;
             const dtw   = isWin ? signedDTW : -signedDTW;
@@ -3756,8 +3762,7 @@ async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
         }
       }
 
-      // ✅ ONLY THIS (no CR handling!)
-      pos = end + 1;
+      pos = end + 1; // only \n
 
       if (++rowsInChunk >= CHUNK_ROWS) {
         rowsInChunk = 0;
@@ -3767,7 +3772,7 @@ async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
       }
     }
 
-    if (DEBUG) console.log(label, "loaded", count, "shf", stats.maxShift);
+    if (DEBUG) console.log(label,"loaded",count,"shf",stats.maxShift,max_dtw,min_dtw);
     return count;
 
   } catch (err) {
@@ -4027,3 +4032,123 @@ window.addEventListener('beforeunload', (event) => {
 */
 
 window.init = init;
+
+/*
+============================================================
+  Sunhorse — Version 2025.12 (jaix4.js)
+  Web-based Thai Checkers (Makhos) — makhos.com
+  Author : Jaroonsak Wangviwat
+  Updated: December 2025
+============================================================
+
+OVERVIEW
+--------
+  Makhos (Thai Checkers) engine playable in the browser via
+  an HTML5 Canvas UI. The computer always plays Dark; the
+  human plays Light (or vice-versa when compFirst is set).
+
+GAME LEVELS (0 – MAX_LEVEL)
+  Level 0 : Beginner — engine gives the player a free piece
+            or promotes a pawn before the game starts.
+  Level 1+ : Engine plays at increasing search depth.
+  Win twice in a row → level up; lose twice → level down.
+
+ENGINE ARCHITECTURE
+-------------------
+  Search     : Iterative-deepening alpha-beta (fail-soft),
+               base depth BASE_DEPTH (≈11 plies), extended
+               by up to MAX_EXTRA_DEPTH when time permits.
+               A single forced-reply also gains +1 ply.
+
+  Move gen   : Mailbox board (64-sq + 120-sq guard ring).
+               Captures are mandatory and multi-jump aware
+               via MSKIP (pass) tokens.  Moves are sorted
+               by move-history heuristic + MVV-LVA.
+
+  Eval       : Material + piece-square tables (mid/end
+               phase).  Opening penalty/bonus rules apply
+               for the first MID_GAME moves.  A lightweight
+               incremental score (evalScoreL) tracks the
+               running LGHT-perspective total and is updated
+               inside makemove/takeback.
+
+  TT         : Zobrist-hashed transposition table,
+               2^TT_POW entries (typed arrays), replace-
+               always on collision, depth-preferred on
+               same key.  Separate EXACT / ALPHA / BETA
+               flags; mate scores are adjusted for ply.
+
+  Endgame DB : Pre-computed databases for 4-, 5-, 6- and
+               7-piece endings (desktop only for 5-7P).
+               Stored in zipped .jpg files (disguised).
+               Format: base-36 board (16 chars) + DTW
+               (1-2 chars, uppercase=win, lowercase=loss).
+               Open-addressing hash table; probe key is the
+               light-perspective Zobrist hash (zpL_lo/hi)
+               without a side-to-move component.
+               *** See KNOWN BUGS below. ***
+
+  Opening BK : Binary book (DB0509.zip) plus a text book
+               (newBK.txt) of human-authored lines.  Board
+               is encoded as a compact BigInt key; weighted
+               random selection among candidates.
+
+  Zobrist    : 64-bit keys split into two Uint32Arrays
+               (lo/hi) to avoid BigInt overhead in the hot
+               path.  zpD_lo[sq][p] = zpL_lo[63-sq][p^1]
+               provides the dark-perspective mirror for
+               free.  A separate zp_side XOR toggles the
+               TT key on each side change.
+
+UI / ANIMATION
+--------------
+  Three visual styles (Classic / Modern / Checkers).
+  Dark pieces are animated by a hand/girl sprite that picks
+  up, drags, and drops pieces with per-level personality
+  (hesitation, error+correction, overshoots, etc.).
+  Captured pieces are deposited in off-board slots.
+  All animation runs through runPhase() / requestAnimationFrame.
+  Web Audio API provides optional sound (three volume levels).
+
+  Canvas layout:
+    pieceCanvas (full-width, extended) holds pieces + slots.
+    boardCanvas (8×8) holds the board texture.
+    animeCanvas (full-width) overlays moving pieces / hand.
+  OFFX/OFFY translate between board-local and page coords.
+
+KNOWN BUGS (as of Dec 2025)
+---------------------------
+  1. DTW arrays declared as Int8Array overflow for DTW > 127,
+     flipping win↔loss.  Change to Int16Array.
+
+  2. Dark-turn EGDB probes use egHashDlo (zpD_lo keys) but the
+     database was built with zpL_lo keys, so dark-turn lookups
+     always miss.  Always probe with egHashLlo/hi.
+
+  3. egSign is hardcoded to 1; must be (isL ? 1 : -1) so that
+     a light-wins result is negated when it is dark's turn.
+     (Fix together with Bug 2.)
+
+  4. EGDB loader does not strip '\r' from CRLF files:
+     1-byte DTW entries get a wrong second char ('\r');
+     2-byte DTW entries are silently rejected.
+     Strip raw[end-1] === 13 before computing lineLen.
+
+  5. aiMainLoop animation guard tests gen_dat[0] & MSKIP
+     instead of bestmv & MSKIP (harmless in practice but
+     semantically wrong).
+
+CONSTANTS / NOTATION
+--------------------
+  LGHT=0, DARK=1          — sides
+  L_PWN=0, D_PWN=1,
+  L_HRS=2, D_HRS=3,
+  EMPTY=4, NOUSE=5        — piece codes
+  pcConv[0..31]           — maps rank 0-31 → board sq 0-63
+  pcFlip[0..31]           — board-mirrored pcConv (dark view)
+  Move word layout:
+    bits  7-0  = from square
+    bits 15-8  = to   square
+    bits 23-16 = flags (MMOVE / MCAPTURE / MPROMOTE / MSKIP)
+============================================================
+*/
