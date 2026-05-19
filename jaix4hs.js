@@ -38,9 +38,12 @@ Zobrist key is 64 bits to avoid key duplication.
 "use strict";
 
 const CODE_VERSION = "x4hs"; // incremental hash and dtw distance to win
-const CODE_DATE = "EG0518";
+const CODE_DATE = "EG0519";
+const cpuCores = navigator.hardwareConcurrency || 0;
+const isMobi = cpuCores < 4 ? true : false; // old devices
 //const isMobi = /Android|iPhone|iPad|iPod/.test(navigator.userAgent);
-const isMobi = false;
+//const screenInfo = `${screen.width}x${screen.height}@${window.devicePixelRatio}`;
+let cpu_ms = 0;
 
 //========== SWITCH ==========
 const DEBUG = false;    // debug mode to disable random
@@ -49,7 +52,7 @@ const FOOTER = DEBUG;
 const USE_BK = true;
 const USE_TT = true;
 const USE_EG = true;
-const BASE_DEPTH = 10;   // depth for level 1, depth 11 takes 5-10 sec per move
+let   BASE_DEPTH = 9;   // depth for level 1
 const MAX_LEVEL = 2;
 
 let level = 1, prevLevel = level; // start level
@@ -300,7 +303,9 @@ let pv = new Array(HIST_STACK), pv_lgth = new Array(HIST_STACK);
 
  *************************************************/
 
+
 function init(){ 
+  detectPerformance();
   initArrays(); loadImages(); loadBKDB(); waitForAssets();
   loadAllEGDB(); //waitForEGDB();
 }
@@ -322,24 +327,18 @@ function getDeviceMetrics() {
         device: (function() {
             const ua = navigator.userAgent;
             const platform = navigator.platform || "";
-
             // 1. Windows is easy to catch
             if (/Win/i.test(ua) || /Win/i.test(platform)) return "Windows";
-
             // 2. Specialized iPad check (Modern iPads identify as Mac)
             if (/Mac/i.test(ua) && navigator.maxTouchPoints > 1) return "iPad";
-
             // 3. Standard Mac (no touch)
             if (/Mac/i.test(ua) || /Mac/i.test(platform)) return "Mac";
-
             // 4. Mobile Devices
             if (/Android/i.test(ua)) return "Android";
             if (/iPhone/i.test(ua)) return "iPhone";
-            
             // 5. Generic Mobile/Linux catch-all
             if (/Mobi/i.test(ua)) return "Mobile";
             if (/Linux/i.test(platform)) return "Linux";
-
             return "Desktop"; 
         })(),
         // Get browser name (simplified)
@@ -350,10 +349,10 @@ function getDeviceMetrics() {
             if (ua.includes("Chrome")) return "Chrome";
             if (ua.includes("Safari")) return "Safari";
             return "Other";
-
         })()
     };
-    return "&result="+metrics.browser+"-"+metrics.device + "&moves="+metrics.ram+"GB";
+    return "&result="+metrics.browser+"-"+metrics.device+"-"+cpuCores+"c"+
+           "&moves="+metrics.ram+"GB"+"-"+cpu_ms+"ms";
 }
 
 function waitForAssets() {
@@ -508,6 +507,20 @@ function pick(a,b,c){
 
 function vary(base, amount = 0.25) { return base * (1 + (Math.random() * 2 - 1) * amount); }
 function randSym(range) { return (Math.random() * 2 - 1) * range; }
+
+function detectPerformance() {
+  const t0 = performance.now();
+  let x = 0;
+  for (let i = 0; i < 5000000; i++) x += i;
+  const t = performance.now() - t0;
+  if      (t > 80) BASE_DEPTH =  9;   // old devices (iPad Air 2)
+  else if (t > 40) BASE_DEPTH = 10;   // average phones
+  else if (t > 20) BASE_DEPTH = 11;   // average PCs
+  else             BASE_DEPTH = 12;   // modern devices (iPhone 16)
+  targetDepth = BASE_DEPTH;
+  cpu_ms = t >>> 0;                   // raw cpu ms
+}
+
 
 /***************** RENDER & INPUT ********************
  
@@ -3073,6 +3086,7 @@ function resetClock() {
 function hideTimers() {
   compTimeElm.textContent = " ";
   playerTimeElm.textContent = " ";
+  //playerTimeElm.textContent = cpu_ms + "ms";
 }
 
 function setTurnUI(isPlayerTurn) {
