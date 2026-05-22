@@ -38,7 +38,7 @@ Zobrist key is 64 bits to avoid key duplication.
 "use strict";
 
 const CODE_VERSION = "x4hs"; // incremental hash and dtw distance to win
-const CODE_DATE = "EG0519";
+const CODE_DATE = "EG0520";
 const cpuCores = navigator.hardwareConcurrency || 0;
 const isMobi = cpuCores < 4 ? true : false; // old devices
 //const isMobi = /Android|iPhone|iPad|iPod/.test(navigator.userAgent);
@@ -268,7 +268,7 @@ for (let i = 0; i < 32; i++) {
 const cellToNum = new Int32Array(64).fill(-1);
 
 /* ===== ENGINE / STACK STATE ===== */
-let side=LGHT, xside=DARK, ply, maxply, compFirst;
+let side=LGHT, xside=DARK, isL=true, ply, maxply, compFirst;
 let moveCount=0, drawCount=0, lastmove, lastmoveCap=0;
 let follow_pv=false, bCompBusy=false;
 
@@ -428,7 +428,7 @@ async function warmUp(ms) {
 }
 
 function initEngineState() {
-  side=LGHT; xside=DARK; gameState=GS_LGHT;
+  setSide(LGHT); gameState=GS_LGHT;
   moveCount=0; drawCount=0; lastmove=MMOVE; lastmoveCap=0;
   ply=0; pv_lgth[0]=0; gen_begin[0]=0;  pcsq.set(pcsq_init);
   randomizeValues(); ttClear(); 
@@ -1474,10 +1474,10 @@ function initCaptureSlots() {
   }
 }
 
-function getFreeCaptureSlot(side){
-  const s  = (side===LGHT) ? capSlotLP : capSlotDP,
-        sx = (side===LGHT) ? capSlotLX : capSlotDX,
-        sy = (side===LGHT) ? capSlotLY : capSlotDY,
+function getFreeCaptureSlot(sd){
+  const s  = (sd===LGHT) ? capSlotLP : capSlotDP,
+        sx = (sd===LGHT) ? capSlotLX : capSlotDX,
+        sy = (sd===LGHT) ? capSlotLY : capSlotDY,
         f  = [];
   for (let i=0;i<CAP_SLOTS;i++) if (s[i]===EMPTY) f.push(i);
   if (!f.length) return null;
@@ -1485,10 +1485,10 @@ function getFreeCaptureSlot(side){
   return { idx, x: sx[idx]*SQPX, y: sy[idx]*SQPX };
 }
 
-function storeCapturedPiece(side, idx, piece) {
+function storeCapturedPiece(sd, idx, piece) {
   //console.log("storeCapturedPiece",side,idx,piece);
   if (idx < 0) return -1;
-  if (side === DARK) capSlotDP[idx] = piece;
+  if (sd === DARK) capSlotDP[idx] = piece;
   else capSlotLP[idx] = piece;
   return idx;
 }
@@ -1642,7 +1642,7 @@ function markDirty(x, y, w, h) {
   }
 }
 
-function clearDirty(x, y, w, h) {
+function clearDirty() {
   animeCtx.clearRect(dirty.x, dirty.y, dirty.w, dirty.h);
   dirty = null;
 }
@@ -2098,7 +2098,7 @@ const D_CNT_BONUS = 2; // comp to keep dark pieces
 
 
 function myeval(){
-  const isL = (side === LGHT);
+  //const isL = (side === LGHT);
   const eLo = isL ? egHashLlo : egHashDlo;
   const eHi = isL ? egHashLhi : egHashDhi;
   //const pa = pc, conv = pcConv;
@@ -2172,8 +2172,10 @@ function myeval(){
 
   /////////////////////////////////////////////////
 
-
   // score based on position of pieces
+  score_LGHT += evalScoreL;
+
+  /*
   const table = (moveCount < MID_GAME) ? pcsq : pcsq_end;
   for (let i = 0; i < 32; i++) {
     const q = pcConv[i], p = pc[q];
@@ -2188,6 +2190,7 @@ function myeval(){
   // --- preservation bias ---
   score_LGHT += (L_PWN_cnt + L_HRS_cnt) * D_CNT_BONUS;
   score_DARK += (D_PWN_cnt + D_HRS_cnt) * D_CNT_BONUS;
+  */
 
   // === Bad Position Penalty ===
   if(pc[8] ===L_PWN && pc[1] ===D_PWN) score_DARK += 17;
@@ -2299,7 +2302,9 @@ function myeval(){
   }
 
   //evalTime += (performance.now() - t0);
-  return (isL ? score_LGHT - score_DARK : score_DARK - score_LGHT);
+
+  const avoidTrade = pieceCount;
+  return (isL ? score_LGHT - score_DARK : score_DARK - score_LGHT) + avoidTrade;
 }
 
 // ===========================================
@@ -2310,10 +2315,10 @@ let evalScoreL = 0; // score_LGHT - score_DARK
 let cur_pcsq = pcsq; // pcsq or pcsq_end
 
 function evalScoreForPiece(sq, p) {
-  if (p === L_PWN) return cur_pcsq[sq] + PWN_VAL;
-  if (p === D_PWN) return -(cur_pcsq[63 - sq] + PWN_VAL);
-  if (p === L_HRS) return HRS_VAL  + 2; // +D_CNT_BONUS
-  if (p === D_HRS) return -(HRS_VAL_D + 2);
+  if (p === L_PWN) return   cur_pcsq[sq]    + PWN_VAL;
+  if (p === D_PWN) return -(cur_pcsq[63-sq] + PWN_VAL);
+  if (p === L_HRS) return   HRS_VAL;
+  if (p === D_HRS) return -(HRS_VAL_D);
   return 0;
 }
 
@@ -2326,7 +2331,6 @@ function recalcEvalScore() {
     evalScoreL += evalScoreForPiece(q, p);
   }
 }
-
 
 // global objects to accumulate times
 let evalTime = 0, ttTime = 0, genTime = 0;
@@ -2458,7 +2462,7 @@ function quiesce(alpha, beta) {
 ************************************************/
 
 function makemove(mv){
-  const isL = (side === LGHT);
+  //const isL = (side === LGHT);
   //const zlo = isL ? zpL_lo : zpD_lo;
   //const zhi = isL ? zpL_hi : zpD_hi;
 
@@ -2590,7 +2594,7 @@ function makemove(mv){
 
 function takeback(){
   revSide();
-  const isL = (side === LGHT);
+  //const isL = (side === LGHT);
   const zlo = isL ? zpL_lo : zpD_lo;
   const zhi = isL ? zpL_hi : zpD_hi;
 
@@ -3080,7 +3084,7 @@ function stopPlayerTimer() {
 
 function resetClock() {
   playerSeconds = compSeconds = 180;
-  setTurnUI(side === LGHT);
+  setTurnUI(isL);
 }
 
 function hideTimers() {
@@ -3757,7 +3761,7 @@ async function loadEGDB(zipUrl, innerFile, storeFn, stats, label) {
 
             const hiDTW = c1 - base + 1;
 
-            const signedDTW = c2
+            let signedDTW = c2
               ? sign * ((hiDTW - 1) * 26 + (c2 - base) + 1)
               : sign * hiDTW;
             // clamp to 126
@@ -4001,10 +4005,10 @@ function bkStore(key, mov) {
 
 // Encode the current board, tuned for speed
 function boardEncode() { 
-  const isLght = (side === LGHT); 
-  const enc = (isLght ? [4n, 5n, 6n, 7n] : [5n, 4n, 7n, 6n]); 
+  //const isLght = (side === LGHT); 
+  const enc = (isL ? [4n, 5n, 6n, 7n] : [5n, 4n, 7n, 6n]); 
   let l = 0n; 
-  if (isLght) { 
+  if (isL) { 
     for (let i = 0; i < 32; i++) { 
       const p = pc[pcConv[i]]; 
       l = (l * (p >= EMPTY ? 2n : 8n)) | (p >= EMPTY ? 0n : enc[p]); 
@@ -4030,8 +4034,8 @@ function boardToText(){
   return s;
 }
 
-function revSide() { side = side===LGHT ? DARK : LGHT; xside = side===LGHT ? DARK : LGHT; }
-
+function revSide() { side ^= 1; xside = side ^ 1; isL = (side === LGHT); }
+function setSide(s = LGHT) { side = s; xside = side ^ 1; isL = (side === LGHT); }
 
 /* Expose minimal API for HTML buttons */
 /*window.newgameClicked = async ()=>{ 
