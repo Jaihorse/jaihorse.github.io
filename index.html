@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1,
     maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="keywords" content="checkers, jaihorse, makhos, sunhorse">
-  <!-- Open Graph / Facebook -->
+    <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://playmakhos.github.io/">
   <meta property="og:title" content="Sunhorse">
@@ -63,7 +63,8 @@
     #bottomRight { text-align: right; min-width: 15%; }
 
     #newgame {
-      display: none; /*visibility:hidden;*/
+      /*visibility:hidden;*/
+      display: none;
       padding: 0 5px; border-radius: 5px; background: #eee; color: #555;
       cursor: pointer;
     }
@@ -71,7 +72,7 @@
     #newgame:hover{ background:#ddd; color:#333; }
 
     #styleSwitch, #styleComp, #soundSwitch, #soundIcon, #reloadSwitch, 
-    #cellNumSwitch, #qaLink img, #newgame {
+    #cellNumSwitch, #qaLink img, #newgame, #nameReloadSwitch {
       display:inline; height: 3.5vmin; 
       vertical-align: middle; margin-left: 1px;
       cursor: pointer; pointer-events: auto;
@@ -112,6 +113,50 @@
       opacity:.7;
     }
     #qaClose:hover{ opacity:1; }
+
+
+    #namePrompt {
+      position:fixed; inset:0; background:rgba(0,0,0,.6);
+      display:flex; align-items:center; justify-content:center;
+      opacity:0; pointer-events:none; transition:.25s; z-index:20;
+    }
+    #namePrompt.show { opacity:1; pointer-events:auto; }
+    #nameBox {
+      position:relative; width:80%; box-sizing:border-box;
+      background: rgba(120,130,140,.35);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 10px; padding: 4vmin; text-align:center;
+    }
+    #nameBox h3{ margin:0 0 2.5vmin; color:#fff; }
+    #nameInput {
+      width:50%; box-sizing:border-box; border:none; border-radius:5px; 
+      padding:1.4vmin; margin-bottom:2.5vmin; background: rgba(255,255,255,.12); 
+      font-size:1em; font-family:inherit; text-align:center; color:#eee; 
+    }
+    #nameSubmit {
+      padding:1vmin 4vmin; border:none; border-radius:6px; cursor:pointer; 
+      background:#eee; color:#555; font-family:inherit; font-size:1em;
+    }
+    #nameSubmit:hover{ background:#ddd; color:#333; }
+    #nameGrid {
+      display:grid; grid-template-columns:repeat(3, 30%);
+      justify-content:center; gap: 1.5vmin;
+    }
+    .nickname {
+      box-sizing:border-box; padding: .7vmin .3vmin;
+      border: 1px solid rgba(255,255,255,.25); border-radius: 6px;
+      background: rgba(255,255,255,.12); color: #eee; font-size: .9em; cursor: pointer;
+    }
+    #customNameLabel {
+      margin-bottom: 1vmin; color: #ddd; font-size: .85em;
+    }
+    .nickname:hover,
+    .nickname.selected { background: rgba(255,255,255,.30); color: #fff; }
+    #nameReload {
+      width:95%; height: 3.5vmin; text-align:right;
+    }
 
     #debug{ font-size:12px; color:#ddd; }
 
@@ -163,16 +208,16 @@
         <!--img id="styleSwitch" /-->
         <span id="cellNumSwitch">123</span>
         <img id="soundSwitch" src="speaker0.png" />
-        <img id="reloadSwitch" src="reload.png" />
+        <img id="reloadSwitch" src="reload.png" title="reset to level 1"/>
       </span>
     </div>
 
-
     <!--div id="vignetteOuter"></div-->
-    <!--div><span id="footer">&nbsp;</span></div-->
+    <div><span id="footer">&nbsp;</span></div>
   </div>
 
-  <script src="WindowResize4xd.js?t=0915>"></script>
+  <!--script src="WindowResize4xd.js?t=0503>"></script-->
+  <script src="WindowResize4xd.js?t=0915"></script>
   <!--script>
     // Resize handler to ensure board stays centered even in frame
     function adjustPageSize() {
@@ -182,6 +227,21 @@
     window.addEventListener("resize", adjustPageSize);
     adjustPageSize(); // run once on load
   </script-->
+
+  <div id="namePrompt">
+    <div id="nameBox">
+      <h3>เลือกชื่อผู้เล่น</h3>
+      <div id="nameGrid"></div>
+      <div id="nameReload">
+        <img id="nameReloadSwitch" src="reload.png" title="สุ่มชื่อใหม่"/>
+      </div>
+      <div id="customNameLabel">หรือตั้งชื่อเอง</div>
+      <input id="nameInput" type="text" maxlength="16"
+             autocomplete="off" placeholder="ชื่ออะไรก็ได้" />
+      <br>
+      <button id="nameSubmit">เริ่มเล่น</button>
+    </div>
+  </div>
 
   <div id="qa">
     <div id="qaBox">
